@@ -41,6 +41,7 @@ Camera Module 3/IMX708 overlay. Its effective `local.conf` settings are:
 INIT_MANAGER = "systemd"
 ENABLE_I2C = "1"
 ENABLE_SPI_BUS = "1"
+ENABLE_UART = "1"
 VIDEO_CAMERA = "1"
 RASPBERRYPI_CAMERA_V3 = "1"
 LICENSE_FLAGS_ACCEPTED += "synaptics-killswitch"
@@ -49,6 +50,23 @@ LICENSE_FLAGS_ACCEPTED += "synaptics-killswitch"
 `RASPBERRYPI_CAMERA_V3` selects the Camera Module 3/IMX708 firmware overlay in
 `meta-raspberrypi`. Review the restricted Wi-Fi firmware license before using
 the accepted `synaptics-killswitch` flag.
+
+## Serial bring-up console
+
+The development image enables the UART at 115200 baud and automatically logs
+in as root on the physical serial console. Connect a 3.3 V USB-to-UART adapter
+with adapter RX to GPIO14/TX (pin 8), adapter TX to GPIO15/RX (pin 10), and
+ground to a Pi ground pin. Do not connect a 5 V UART signal.
+
+Open the console from the build host, replacing the device path as needed:
+
+```sh
+picocom --baud 115200 /dev/ttyUSB0
+```
+
+The empty root password is limited to this local development console; SSH does
+not allow empty-password root login. Remove serial autologin from the eventual
+production image.
 
 ## Build and deploy
 
@@ -82,9 +100,10 @@ The 2026-08-11 build completed all 5,724 tasks successfully. This confirms the
 metadata and image build; physical hardware boot and interface tests remain
 required.
 
-GitHub Actions performs fast kas and BitBake metadata checks for pull requests
-and pushes to `main`. The complete `yocto-check-layer` signature suite runs only
-when the workflow is started manually. Neither mode compiles or boots the image.
+The `Yocto sanity` GitHub Actions workflow performs fast kas and BitBake metadata
+checks for pull requests and pushes to `main`. Run the separate `Yocto full layer
+check` workflow manually when the complete `yocto-check-layer` signature suite
+is needed. Neither workflow compiles or boots the image.
 Full builds require about 66 GB of build-directory storage and remain a local
 developer responsibility.
 

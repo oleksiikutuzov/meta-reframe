@@ -3,8 +3,14 @@ DESCRIPTION = "Development image for validating Raspberry Pi Zero 2 W interfaces
 
 inherit core-image
 
-# Keep SSH and diagnostic tools available until hardware bring-up is stable.
-IMAGE_FEATURES = "ssh-server-openssh"
+# Keep SSH, a physical serial console, and diagnostic tools available until
+# hardware bring-up is stable. Empty-password login remains limited to serial;
+# SSH empty-password and root login are not enabled.
+IMAGE_FEATURES = " \
+    ssh-server-openssh \
+    empty-root-password \
+    serial-autologin-root \
+"
 
 IMAGE_INSTALL += " \
     packagegroup-core-boot \
