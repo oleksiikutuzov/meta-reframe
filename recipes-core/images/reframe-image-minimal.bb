@@ -7,17 +7,15 @@ inherit core-image
 # in addition to the compressed Raspberry Pi machine artifacts.
 IMAGE_FSTYPES:append = " wic"
 
-# Keep SSH, a physical serial console, and diagnostic tools available until
-# hardware bring-up is stable. Empty-password login remains limited to serial;
-# SSH empty-password and root login are not enabled.
-IMAGE_FEATURES = " \
-    ssh-server-openssh \
-    empty-root-password \
-    serial-autologin-root \
-"
+# DEBUG_BUILD enables bring-up access and tools. Empty-password login remains
+# limited to serial; SSH empty-password and root login are not enabled.
+IMAGE_FEATURES = "${@oe.utils.vartrue('DEBUG_BUILD', \
+    'ssh-server-openssh empty-root-password serial-autologin-root', '', d)}"
+
+REFRAME_DEBUG_PACKAGES = "${@oe.utils.vartrue('DEBUG_BUILD', \
+    'i2c-tools systemd-analyze v4l-utils', '', d)}"
 
 IMAGE_INSTALL += " \
     packagegroup-core-boot \
-    i2c-tools \
-    v4l-utils \
+    ${REFRAME_DEBUG_PACKAGES} \
 "
