@@ -82,9 +82,11 @@ The 2026-08-11 build completed all 5,724 tasks successfully. This confirms the
 metadata and image build; physical hardware boot and interface tests remain
 required.
 
-GitHub Actions performs metadata and layer sanity checks only. A successful CI
-run does not mean that the image compiled or booted. Full builds require about
-66 GB of build-directory storage and remain a local developer responsibility.
+GitHub Actions performs fast kas and BitBake metadata checks for pull requests
+and pushes to `main`. The complete `yocto-check-layer` signature suite runs only
+when the workflow is started manually. Neither mode compiles or boots the image.
+Full builds require about 66 GB of build-directory storage and remain a local
+developer responsibility.
 
 On the target, verify boot, interfaces, and camera discovery:
 
@@ -96,3 +98,9 @@ systemd-analyze critical-chain
 ```
 
 Camera capture through libcamera and Picamera2 belongs to the next milestone.
+
+## Contributing
+
+Send patches through GitHub pull requests. Keep each patch focused on one
+milestone and state the validation performed. The layer maintainer is Oleksii
+Kutuzov <oleksii.kutuzov@icloud.com>.
