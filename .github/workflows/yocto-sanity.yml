@@ -73,6 +73,8 @@ jobs:
               "INIT_MANAGER=\"systemd\"" \
               "ENABLE_I2C=\"1\"" \
               "ENABLE_SPI_BUS=\"1\"" \
+              "ENABLE_UART=\"1\"" \
+              "SERIAL_CONSOLES=\"115200;ttyS0\"" \
               "VIDEO_CAMERA=\"1\"" \
               "RASPBERRYPI_CAMERA_V3=\"1\""; do
               grep -Fqx "${expected}" bitbake.env
