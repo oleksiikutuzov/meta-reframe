@@ -19,17 +19,30 @@ build on 2026-08-11.
 mkdir reframe-yocto
 cd reframe-yocto
 git clone https://github.com/oleksiikutuzov/meta-reframe.git
-cd meta-reframe
 
 pipx install kas==5.3
-kas checkout kas/reframe.yml
+KAS_WORK_DIR="$PWD" kas checkout meta-reframe/kas/reframe.yml
 ```
 
-`kas checkout` resolves the pinned repositories and writes `build/conf`. To
-inspect or debug the resulting BitBake environment directly, use:
+Run kas from the `reframe-yocto` project directory, not from inside the
+`meta-reframe` repository. `KAS_WORK_DIR` keeps all checked-out layers at the
+same level:
+
+```text
+reframe-yocto/
+├── bitbake/
+├── meta-openembedded/
+├── meta-raspberrypi/
+├── meta-reframe/
+├── openembedded-core/
+└── build/
+```
+
+`kas checkout` resolves the pinned repositories and writes `build/conf`. From
+the same project directory, inspect or debug the BitBake environment with:
 
 ```sh
-kas shell kas/reframe.yml
+KAS_WORK_DIR="$PWD" kas shell meta-reframe/kas/reframe.yml
 ```
 
 ## Raspberry Pi Zero 2 W configuration
@@ -73,19 +86,19 @@ production image.
 Build the bring-up image with the pinned configuration:
 
 ```sh
-kas build kas/reframe.yml
+KAS_WORK_DIR="$PWD" kas build meta-reframe/kas/reframe.yml
 ```
 
 For quicker metadata checks, run:
 
 ```sh
-kas shell kas/reframe.yml -c 'bitbake-layers show-layers'
-kas shell kas/reframe.yml -c 'bitbake-layers show-recipes reframe-image-minimal'
-kas shell kas/reframe.yml -c 'bitbake -p reframe-image-minimal'
+KAS_WORK_DIR="$PWD" kas shell meta-reframe/kas/reframe.yml -c 'bitbake-layers show-layers'
+KAS_WORK_DIR="$PWD" kas shell meta-reframe/kas/reframe.yml -c 'bitbake-layers show-recipes reframe-image-minimal'
+KAS_WORK_DIR="$PWD" kas shell meta-reframe/kas/reframe.yml -c 'bitbake -p reframe-image-minimal'
 ```
 
 Artifacts are written below
-`tmp/deploy/images/raspberrypi0-2w-64/`. The tested configuration produces the
+`build/tmp/deploy/images/raspberrypi0-2w-64/`. The tested configuration produces the
 stable symlink
 `reframe-image-minimal-raspberrypi0-2w-64.rootfs.wic`, a compressed `.wic.bz2`
 variant, and the matching `.wic.bmap` file.
@@ -99,7 +112,7 @@ compressed image with:
 
 ```sh
 sudo bmaptool copy \
-    tmp/deploy/images/raspberrypi0-2w-64/reframe-image-minimal-raspberrypi0-2w-64.rootfs.wic.bz2 \
+    build/tmp/deploy/images/raspberrypi0-2w-64/reframe-image-minimal-raspberrypi0-2w-64.rootfs.wic.bz2 \
     /dev/sdX
 ```
 

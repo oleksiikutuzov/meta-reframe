@@ -17,12 +17,17 @@ Keep files close to the recipe that owns them. Add shared BitBake classes under 
 Use the pinned kas workflow documented in `README.md`:
 
 ```sh
-kas checkout kas/reframe.yml
-kas shell kas/reframe.yml -c 'bitbake -p reframe-image-minimal'
-kas build kas/reframe.yml
+KAS_WORK_DIR="$PWD" kas checkout meta-reframe/kas/reframe.yml
+KAS_WORK_DIR="$PWD" kas shell meta-reframe/kas/reframe.yml -c 'bitbake -p reframe-image-minimal'
+KAS_WORK_DIR="$PWD" kas build meta-reframe/kas/reframe.yml
 ```
 
-The first two commands validate repository resolution and metadata parsing. The final command performs the approximately 66 GB full Pi Zero 2 W image build and must run locally, not on a standard GitHub-hosted runner. Build every affected recipe for each supported machine before submitting changes.
+Run these commands from the parent `reframe-yocto/` project directory so kas
+checks out all layers beside `meta-reframe/`. The first two commands validate
+repository resolution and metadata parsing. The final command performs the
+approximately 66 GB full Pi Zero 2 W image build and must run locally, not on a
+standard GitHub-hosted runner. Build every affected recipe for each supported
+machine before submitting changes.
 
 ## Coding Style & Naming Conventions
 
