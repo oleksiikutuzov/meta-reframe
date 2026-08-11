@@ -87,8 +87,15 @@ kas shell kas/reframe.yml -c 'bitbake -p reframe-image-minimal'
 Artifacts are written below
 `tmp/deploy/images/raspberrypi0-2w-64/`. The tested configuration produces the
 stable symlink
-`reframe-image-minimal-raspberrypi0-2w-64.rootfs.wic.bz2` and its matching
-`.wic.bmap` file. After confirming the destination device, flash it with:
+`reframe-image-minimal-raspberrypi0-2w-64.rootfs.wic`, a compressed `.wic.bz2`
+variant, and the matching `.wic.bmap` file.
+
+To flash with Balena Etcher, select the uncompressed `.wic` file as the image,
+select the correct SD card, and start the flash. Etcher writes the complete disk
+layout, so do not extract or copy individual partitions.
+
+For command-line deployment, confirm the destination device and flash the
+compressed image with:
 
 ```sh
 sudo bmaptool copy \
