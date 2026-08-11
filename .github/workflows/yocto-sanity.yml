@@ -70,6 +70,7 @@ jobs:
             bitbake -e reframe-image-minimal > bitbake.env
             for expected in \
               "MACHINE=\"raspberrypi0-2w-64\"" \
+              "DEBUG_BUILD=\"1\"" \
               "INIT_MANAGER=\"systemd\"" \
               "ENABLE_I2C=\"1\"" \
               "ENABLE_SPI_BUS=\"1\"" \

@@ -51,10 +51,11 @@ The kas configuration selects `raspberrypi0-2w-64`, systemd, I2C, SPI, and the
 Camera Module 3/IMX708 overlay. Its effective `local.conf` settings are:
 
 ```sh
+DEBUG_BUILD = "1"
 INIT_MANAGER = "systemd"
 ENABLE_I2C = "1"
 ENABLE_SPI_BUS = "1"
-ENABLE_UART = "1"
+ENABLE_UART = "${@oe.utils.vartrue('DEBUG_BUILD', '1', '0', d)}"
 VIDEO_CAMERA = "1"
 RASPBERRYPI_CAMERA_V3 = "1"
 LICENSE_FLAGS_ACCEPTED += "synaptics-killswitch"
@@ -64,10 +65,18 @@ LICENSE_FLAGS_ACCEPTED += "synaptics-killswitch"
 `meta-raspberrypi`. Review the restricted Wi-Fi firmware license before using
 the accepted `synaptics-killswitch` flag.
 
+`DEBUG_BUILD = "1"` enables SSH, the UART console with root autologin, an empty
+root password for that console, and the `i2c-tools`, `v4l-utils`, and
+`systemd-analyze` packages. Without that setting these development additions
+are omitted and UART is disabled. This standard OpenEmbedded variable also
+selects debug compiler optimization, so unset it or set it to `0` for release
+builds.
+
 ## Serial bring-up console
 
-The development image enables the UART at 115200 baud and automatically logs
-in as root on the physical serial console. Connect a 3.3 V USB-to-UART adapter
+With `DEBUG_BUILD = "1"`, the image enables the UART at 115200 baud and
+automatically logs in as root on the physical serial console. Connect a 3.3 V
+USB-to-UART adapter
 with adapter RX to GPIO14/TX (pin 8), adapter TX to GPIO15/RX (pin 10), and
 ground to a Pi ground pin. Do not connect a 5 V UART signal.
 
