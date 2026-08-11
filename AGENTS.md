@@ -6,6 +6,7 @@ This repository is an independent Yocto/OpenEmbedded layer. Its current layout i
 
 - `conf/layer.conf` — layer registration, dependencies, and Wrynose compatibility.
 - `recipes-core/images/` — image recipes, beginning with the hardware bring-up target.
+- `kas/` — pinned repositories and canonical build configuration.
 - `docs/` — dependency mapping and future hardware/boot documentation.
 - `recipes-*/<component>/files/` — patches, services, and configuration owned by a recipe.
 
@@ -13,16 +14,15 @@ Keep files close to the recipe that owns them. Add shared BitBake classes under 
 
 ## Build, Test, and Development Commands
 
-Use the direct BitBake/OpenEmbedded-Core workflow documented in `README.md`. From an initialized build environment with this layer in `BBLAYERS`:
+Use the pinned kas workflow documented in `README.md`:
 
 ```sh
-bitbake-layers show-layers
-bitbake-layers show-recipes reframe-image-minimal
-bitbake-layers show-appends
-bitbake reframe-image-minimal
+kas checkout kas/reframe.yml
+kas shell kas/reframe.yml -c 'bitbake -p reframe-image-minimal'
+kas build kas/reframe.yml
 ```
 
-The first commands validate layer discovery and recipe parsing. The final command builds the Pi Zero 2 W hardware bring-up image. Build every affected recipe for each supported machine before submitting changes.
+The first two commands validate repository resolution and metadata parsing. The final command performs the approximately 66 GB full Pi Zero 2 W image build and must run locally, not on a standard GitHub-hosted runner. Build every affected recipe for each supported machine before submitting changes.
 
 ## Coding Style & Naming Conventions
 
