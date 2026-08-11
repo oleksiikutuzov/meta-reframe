@@ -3,6 +3,10 @@ DESCRIPTION = "Development image for validating Raspberry Pi Zero 2 W interfaces
 
 inherit core-image
 
+# Deploy an uncompressed disk image for graphical flashers such as Balena Etcher
+# in addition to the compressed Raspberry Pi machine artifacts.
+IMAGE_FSTYPES:append = " wic"
+
 # Keep SSH, a physical serial console, and diagnostic tools available until
 # hardware bring-up is stable. Empty-password login remains limited to serial;
 # SSH empty-password and root login are not enabled.
