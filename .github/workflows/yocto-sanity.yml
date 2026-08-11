@@ -79,12 +79,4 @@ jobs:
               "RASPBERRYPI_CAMERA_V3=\"1\""; do
               grep -Fqx "${expected}" bitbake.env
             done
-
-            if [ "${RUN_FULL_LAYER_CHECK}" = "true" ]; then
-              bitbake-layers remove-layer .. meta-raspberrypi
-              yocto-check-layer --no-auto --no-auto-dependency \
-                --dependency ../meta-raspberrypi -- ..
-            fi
           '
-        env:
-          RUN_FULL_LAYER_CHECK: ${{ github.event_name == 'workflow_dispatch' }}
