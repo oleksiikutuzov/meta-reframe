@@ -1,0 +1,45 @@
+header:
+  version: 22
+
+machine: raspberrypi0-2w-64
+distro: nodistro
+target: reframe-image-minimal
+
+repos:
+  bitbake:
+    url: https://git.openembedded.org/bitbake
+    commit: fae9db3168dbff1b8c76fe9c6726a9687ff97514
+    layers:
+      .: disabled
+
+  openembedded-core:
+    url: https://git.openembedded.org/openembedded-core
+    commit: f09a0f28aeb54ddd90415dd458338e1565bb5a49
+    layers:
+      meta:
+
+  meta-openembedded:
+    url: https://git.openembedded.org/meta-openembedded
+    commit: 6bf0d8ad57b33950bab4c7f6c037e1ccb6f6e2eb
+    layers:
+      meta-oe:
+      meta-python:
+      meta-networking:
+      meta-multimedia:
+
+  meta-raspberrypi:
+    url: https://github.com/agherzan/meta-raspberrypi.git
+    commit: f62c67921474370829d24a4fa01ef88543f3906b
+
+  meta-reframe:
+
+local_conf_header:
+  reframe-hardware: |
+    INIT_MANAGER = "systemd"
+    ENABLE_I2C = "1"
+    ENABLE_SPI_BUS = "1"
+    VIDEO_CAMERA = "1"
+    RASPBERRYPI_CAMERA_V3 = "1"
+
+    # Required by the Pi Zero 2 W Wi-Fi firmware recipe.
+    LICENSE_FLAGS_ACCEPTED += "synaptics-killswitch"
