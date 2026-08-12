@@ -1,0 +1,83 @@
+name: Yocto sanity
+
+on:
+  pull_request:
+    paths:
+      - "conf/**"
+      - "recipes-*/**"
+      - "kas/**"
+      - ".github/workflows/**"
+      - "classes*/**"
+      - "wic/**"
+      - "README.md"
+  push:
+    branches:
+      - main
+    paths:
+      - "conf/**"
+      - "recipes-*/**"
+      - "kas/**"
+      - ".github/workflows/**"
+      - "classes*/**"
+      - "wic/**"
+      - "README.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  layer-sanity:
+    name: kas-config / layer-parse
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+
+    steps:
+      - name: Check out meta-reframe
+        uses: actions/checkout@v4
+
+      - name: Install Yocto host dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends \
+            chrpath cpio diffstat file gawk gcc git iputils-ping libacl1 \
+            locales lz4 python3-git python3-jinja2 python3-pexpect \
+            python3-pip python3-subunit socat texinfo unzip wget xz-utils zstd
+
+      - name: Install kas
+        run: python3 -m pip install --user "kas==5.3"
+
+      - name: Enable unprivileged user namespaces for BitBake
+        run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+
+      - name: Resolve pinned repositories
+        run: ~/.local/bin/kas checkout kas/reframe.yml
+
+      - name: Validate Yocto layer metadata
+        run: |
+          ~/.local/bin/kas shell kas/reframe.yml -c '
+            set -eu
+            bitbake -p reframe-image-minimal
+
+            bitbake-layers show-layers | tee layers.txt
+            for collection in core openembedded-layer meta-python raspberrypi reframe; do
+              grep -Eq "^${collection}[[:space:]]" layers.txt
+            done
+
+            bitbake-layers show-recipes reframe-image-minimal | tee recipes.txt
+            grep -Eq "^reframe-image-minimal:" recipes.txt
+
+            bitbake -e reframe-image-minimal > bitbake.env
+            for expected in \
+              "MACHINE=\"raspberrypi0-2w-64\"" \
+              "DEBUG_BUILD=\"1\"" \
+              "INIT_MANAGER=\"systemd\"" \
+              "ENABLE_I2C=\"1\"" \
+              "ENABLE_SPI_BUS=\"1\"" \
+              "ENABLE_UART=\"1\"" \
+              "SERIAL_CONSOLES=\"115200;ttyS0\"" \
+              "VIDEO_CAMERA=\"1\"" \
+              "RASPBERRYPI_CAMERA_V3=\"1\""; do
+              grep -Fqx "${expected}" bitbake.env
+            done
+          '
