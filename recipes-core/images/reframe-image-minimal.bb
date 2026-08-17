@@ -20,4 +20,5 @@ IMAGE_INSTALL += " \
     ${REFRAME_DEBUG_PACKAGES} \
     libcamera-apps \
     python3-picamera2 \
+    reframe \
 "
