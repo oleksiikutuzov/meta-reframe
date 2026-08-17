@@ -39,7 +39,7 @@ No automated test suite or coverage target exists yet. The baseline is a clean m
 
 ## Commit & Pull Request Guidelines
 
-Use concise, imperative, scoped subjects, for example `images: add camera diagnostics`. Keep each commit limited to one logical milestone. Commits substantially created with an AI agent must identify that agent with a Git trailer, for example `Assisted-by: Codex`. Pull requests should explain motivation, list exact layer revisions, tested machines, and commands, link related issues, and call out licensing or compatibility changes. Include logs for failures and screenshots only for visible UI changes.
+Use concise, imperative, scoped subjects, for example `images: add camera diagnostics`. Keep each commit limited to one logical milestone. Commits substantially created with an AI agent must identify that agent as a co-author with a Git trailer, for example `Co-authored-by: Codex <codex@openai.com>`. Pull requests should explain motivation, list exact layer revisions, tested machines, and commands, link related issues, and call out licensing or compatibility changes. Include logs for failures and screenshots only for visible UI changes.
 
 ## Integration Constraints
 
