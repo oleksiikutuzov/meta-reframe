@@ -41,6 +41,17 @@ reFrame
 |   +-- SPI
 |   +-- GPIO
 |
++-- Wi-Fi provisioning
+|   +-- NetworkManager
+|   |   +-- wpa_supplicant
+|   |   +-- nftables
+|   |   +-- private dnsmasq instance for IPv4 shared/AP mode
+|   +-- reframe-network
+|   |   +-- Python standard-library HTTP server
+|   |   +-- nmcli
+|   |   +-- captive-portal DNS and HTTP redirects
+|   +-- Avahi (`reframe.local`)
+|
 +-- PiSugar 3
     +-- I2C
     +-- pisugar-server
@@ -58,3 +69,8 @@ reFrame
   under `/var/lib/reframe`.
 - Treat Waveshare, networking/dashboard, and PiSugar support as separate,
   testable integration stages.
+- Keep Wi-Fi credentials in NetworkManager profiles created on the target; do
+  not put them in recipes or application settings.
+- Keep the system-wide dnsmasq service disabled. NetworkManager owns a private
+  dnsmasq process for each IPv4 shared connection, and a second daemon will
+  collide on the hotspot DNS socket.
