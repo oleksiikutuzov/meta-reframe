@@ -1,0 +1,31 @@
+From f3011b5fae183a463630b4168626dfefe9b4c74e Mon Sep 17 00:00:00 2001
+From: Naushir Patuck <naush@raspberrypi.com>
+Date: Thu, 16 Oct 2025 14:45:33 +0100
+Subject: [PATCH] core: Switch libcamera string controls to use
+ std::string_view
+
+This is a change to the libcamera API, switch to std::string_view from
+std::string.
+
+Upstream-Status: Backport [f3011b5fae183a463630b4168626dfefe9b4c74e]
+Signed-off-by: Naushir Patuck <naush@raspberrypi.com>
+---
+ core/options.cpp    | 2 +-
+ core/rpicam_app.cpp | 3 +--
+ 2 files changed, 2 insertions(+), 3 deletions(-)
+
+diff --git a/core/options.cpp b/core/options.cpp
+index cf704c2..d329654 100644
+--- a/core/options.cpp
++++ b/core/options.cpp
+@@ -421 +421 @@ bool OptsInternal::Parse(boost::program_options::variables_map &vm, RPiCamApp *a
+-		const std::string cam_id = *cameras[camera]->properties().get(libcamera::properties::Model);
++		const std::string_view cam_id = *cameras[camera]->properties().get(libcamera::properties::Model);
+diff --git a/core/rpicam_app.cpp b/core/rpicam_app.cpp
+index 9e5a2d0..0f0b5ff 100644
+--- a/core/rpicam_app.cpp
++++ b/core/rpicam_app.cpp
+@@ -131,2 +131 @@ std::string RPiCamApp::CameraModel() const
+-	auto model = camera_->properties().get(properties::Model);
+-	return model ? *model : camera_->id();
++	return std::string(camera_->properties().get(properties::Model).value_or(camera_->id()));

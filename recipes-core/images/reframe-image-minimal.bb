@@ -18,4 +18,5 @@ REFRAME_DEBUG_PACKAGES = "${@oe.utils.vartrue('DEBUG_BUILD', \
 IMAGE_INSTALL += " \
     packagegroup-core-boot \
     ${REFRAME_DEBUG_PACKAGES} \
+    libcamera-apps \
 "
