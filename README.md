@@ -6,8 +6,8 @@ first target is a Raspberry Pi Zero 2 W (64-bit) with Camera Module 3 (IMX708),
 I2C, and SPI enabled.
 
 The current milestone provides a hardware bring-up image with headless
-libcamera capture tools. It deliberately does **not** package the reFrame
-application, dashboard, or PiSugar software.
+libcamera and Picamera2 capture support. It deliberately does **not** package
+the reFrame application, dashboard, or PiSugar software.
 
 ## Build environment
 
@@ -126,9 +126,10 @@ sudo bmaptool copy \
     /dev/sdX
 ```
 
-The 2026-08-11 build completed all 5,724 tasks successfully. This confirms the
-metadata and image build; physical hardware boot and interface tests remain
-required.
+The 2026-08-17 build completed all 6,702 tasks successfully. This confirms the
+metadata, package QA, root filesystem, and WIC image build. The libcamera
+capture path has been validated on physical hardware; repeat the Picamera2 test
+below after deploying this milestone.
 
 The `Yocto sanity` GitHub Actions workflow performs fast kas and BitBake metadata
 checks for pull requests and pushes to `main`. Run the separate `Yocto full layer
@@ -154,7 +155,22 @@ rpicam-still -n --timeout 2000 -o /tmp/camera-test.jpg
 ls -lh /tmp/camera-test.jpg
 ```
 
-Picamera2 integration belongs to the next milestone.
+Verify the Python API with a second headless still capture:
+
+```sh
+python3 - <<'PY'
+from picamera2 import Picamera2
+
+camera = Picamera2()
+try:
+    camera.start_and_capture_file(
+        "/tmp/picamera2-test.jpg", show_preview=False
+    )
+finally:
+    camera.close()
+PY
+ls -lh /tmp/picamera2-test.jpg
+```
 
 ## Contributing
 
