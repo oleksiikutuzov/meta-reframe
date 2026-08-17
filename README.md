@@ -5,11 +5,10 @@ purpose-built Linux image for the open-source reFrame camera hardware. The
 first target is a Raspberry Pi Zero 2 W (64-bit) with Camera Module 3 (IMX708),
 I2C, and SPI enabled.
 
-The current milestone adds the pinned reFrame camera application to the
-hardware bring-up image. The application runs as an unprivileged systemd
-service, keeps immutable code under `/usr/lib/reframe`, and stores settings and
-captured images under `/var/lib/reframe`. Display, dashboard, networking, and
-PiSugar integration remain disabled until their separate milestones.
+The current milestone adds Wi-Fi provisioning to the packaged reFrame camera
+image. NetworkManager first tries saved networks and falls back to a temporary
+`reFrame-Setup` access point with a browser-based setup page. Display, dashboard,
+and PiSugar integration remain disabled until their separate milestones.
 
 ## Build environment
 
@@ -61,6 +60,7 @@ ENABLE_SPI_BUS = "1"
 ENABLE_UART = "${@oe.utils.vartrue('DEBUG_BUILD', '1', '0', d)}"
 VIDEO_CAMERA = "1"
 RASPBERRYPI_CAMERA_V3 = "1"
+hostname:pn-base-files = "reframe"
 LICENSE_FLAGS_ACCEPTED += "synaptics-killswitch"
 ```
 
@@ -197,6 +197,31 @@ PiSugar button bus, the startup capture still succeeds but the process exits
 afterward and systemd restarts it, producing repeated captures. Stop and disable
 `reframe.service` when testing without I2C until optional button handling is
 implemented in the PiSugar milestone.
+
+## Wi-Fi provisioning
+
+On first boot, or whenever no saved Wi-Fi connection can be activated, join the
+open `reFrame-Setup` access point. Phones and laptops should open the Wi-Fi
+setup page as a captive portal; `http://10.42.0.1` remains the manual fallback.
+Select a network and enter its password. The access point disappears while the single
+Wi-Fi radio changes to client mode; after it connects, open
+`http://reframe.local`. NetworkManager stores the connection on the device and
+reconnects it on later boots. No Wi-Fi credentials are part of the image.
+
+The setup access point is deliberately open because this milestone cannot show
+a per-device secret without a working display. Provision in a trusted physical
+environment. The setup service keeps listening after provisioning so network
+settings can be changed at `http://reframe.local`; authentication and HTTPS are
+required before treating that page as a production management interface.
+
+Inspect or recover networking over UART with:
+
+```sh
+systemctl status NetworkManager reframe-network avahi-daemon
+nmcli device status
+nmcli connection show
+journalctl -u reframe-network -u NetworkManager -b --no-pager
+```
 
 ## Contributing
 
