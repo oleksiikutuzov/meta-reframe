@@ -45,16 +45,7 @@ under `/var/lib/reframe` and layer-owned systemd units.
 fails gracefully, captures an original JPEG, writes processed output, persists
 settings across reboot, and never writes into `/usr/lib/reframe`.
 
-### v0.4 — Spectra 6 display
-
-Package the bundled Waveshare driver with reFrame and validate SPI/GPIO panel
-control independently before enabling application-driven refresh.
-
-**Exit gate:** A standalone panel test succeeds, reFrame displays its processed
-image, repeated refreshes complete without service crashes, and a reboot restores
-normal capture-to-display operation.
-
-### v0.5 — Networking and provisioning
+### v0.4 — Networking and provisioning
 
 Add Wi-Fi, DHCP, hostname resolution, mDNS, and an explicit provisioning path
 outside the application recipe. Do not embed credentials or assume `wlan0`.
@@ -62,6 +53,15 @@ outside the application recipe. Do not embed credentials or assume `wlan0`.
 **Exit gate:** A new device can be provisioned without rebuilding the image,
 reconnects after reboot and access-point loss, advertises `reframe.local`, and
 retains UART recovery access when networking is unavailable.
+
+### v0.5 — Spectra 6 display
+
+Package the bundled Waveshare driver with reFrame and validate SPI/GPIO panel
+control independently before enabling application-driven refresh.
+
+**Exit gate:** A standalone panel test succeeds, reFrame displays its processed
+image, repeated refreshes complete without service crashes, and a reboot restores
+normal capture-to-display operation.
 
 ### v0.6 — Dashboard
 
