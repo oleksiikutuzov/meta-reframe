@@ -19,4 +19,5 @@ IMAGE_INSTALL += " \
     packagegroup-core-boot \
     ${REFRAME_DEBUG_PACKAGES} \
     libcamera-apps \
+    python3-picamera2 \
 "

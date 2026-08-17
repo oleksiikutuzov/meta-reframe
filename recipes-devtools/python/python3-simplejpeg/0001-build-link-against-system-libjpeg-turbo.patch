@@ -1,0 +1,57 @@
+From 1d781152c076328f88039f72ed2a66bab55996f9 Mon Sep 17 00:00:00 2001
+From: Codex <codex@openai.com>
+Date: Mon, 17 Aug 2026 21:00:00 +0000
+Subject: [PATCH] build: link against system libjpeg-turbo
+
+Do not download and cross-compile a private libjpeg-turbo from setup.py.
+OpenEmbedded provides the target library and headers through the recipe
+sysroot.
+
+Upstream-Status: Inappropriate [OpenEmbedded cross-compilation]
+Signed-off-by: Codex <codex@openai.com>
+---
+ pyproject.toml |  5 ++---
+ setup.py       | 18 ++----------------
+ 2 files changed, 4 insertions(+), 19 deletions(-)
+
+diff --git a/pyproject.toml b/pyproject.toml
+index 8314d45..ee43c1d 100644
+--- a/pyproject.toml
++++ b/pyproject.toml
+@@ -33 +33 @@ requires = [
+-    "cython~=3.1.0",
++    "cython",
+@@ -36,2 +36 @@
+-backend-path = ["custom_build_backend"]
+-build-backend = "custom_build_meta"
++build-backend = "setuptools.build_meta"
+
+diff --git a/setup.py b/setup.py
+index 68a58a1..62484c7 100644
+--- a/setup.py
++++ b/setup.py
+@@ -102,6 +102 @@
+-# download sources
+-JPEG_DIR = untar_url(
+-    JPEG_URL,
+-    pt.join(PACKAGE_DIR, 'lib', JPEG_SOURCE),
+-    '02bc433d5c80ba13541b527d2860f354111cb749dbfd24efca3bf082f2c73e19',
+-)
++JPEG_DIR = pt.join(PACKAGE_DIR, 'lib', 'libjpeg-turbo-' + JPEG_VERSION)
+@@ -210 +205,0 @@ def make_jpeg_module():
+-        pt.join(JPEG_DIR, 'src'),
+@@ -213 +207,0 @@ def make_jpeg_module():
+-    static_libs = [pt.join(_libdir(), _staticlib())]
+@@ -219,6 +212,0 @@ def make_jpeg_module():
+-        extra_link_args.extend([
+-            '-Wl,'  # following are linker options
+-            '--strip-all,'  # Remove all symbols
+-            '--exclude-libs,ALL,'  # Do not export symbols
+-            '--gc-sections'  # Remove unused sections
+-        ])
+@@ -243 +230 @@ def make_jpeg_module():
+-        extra_objects=static_libs,
++        libraries=['turbojpeg'],
+@@ -340 +327 @@ with ConcatFiles(*LICENSE_FILES):
+-        cmdclass={'build_ext': cmake_build_ext},
++        cmdclass={'build_ext': build_ext},
