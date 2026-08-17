@@ -42,6 +42,7 @@ local_conf_header:
     ENABLE_UART = "${@oe.utils.vartrue('DEBUG_BUILD', '1', '0', d)}"
     VIDEO_CAMERA = "1"
     RASPBERRYPI_CAMERA_V3 = "1"
+    hostname:pn-base-files = "reframe"
 
     # Required by the Pi Zero 2 W Wi-Fi firmware recipe.
     LICENSE_FLAGS_ACCEPTED += "synaptics-killswitch"
