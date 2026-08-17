@@ -1,9 +1,9 @@
 # reFrame Dependency Map
 
 This map records the expected integration boundaries. The initial image covers
-only system boot, I2C/SPI tooling, and kernel camera discovery; application
-dependencies must be verified against the selected Wrynose layers before they
-are added.
+system boot, I2C/SPI tooling, kernel camera discovery, and headless libcamera
+capture; application dependencies must be verified against the selected
+Wrynose layers before they are added.
 
 ```text
 reFrame

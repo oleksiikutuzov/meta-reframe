@@ -1,0 +1,31 @@
+From 7bb9254523898142c911ce4c51d13d55c4ce78df Mon Sep 17 00:00:00 2001
+From: Codex <codex@openai.com>
+Date: Mon, 17 Aug 2026 19:30:00 +0000
+Subject: [PATCH] rpi: initialize buffer index before stream lookup
+
+GCC 15 cannot infer from ASSERT(stream) that index was assigned by the
+preceding loop and reports maybe-uninitialized errors. Initialize index to
+the value getBufferId() uses for no matching buffer. The assertion continues
+to catch a buffer that does not belong to any stream.
+
+Upstream-Status: Pending
+Signed-off-by: Codex <codex@openai.com>
+---
+ src/libcamera/pipeline/rpi/pisp/pisp.cpp | 2 +-
+ src/libcamera/pipeline/rpi/vc4/vc4.cpp   | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/src/libcamera/pipeline/rpi/pisp/pisp.cpp b/src/libcamera/pipeline/rpi/pisp/pisp.cpp
+index 53fa026a..a115579e 100644
+--- a/src/libcamera/pipeline/rpi/pisp/pisp.cpp
++++ b/src/libcamera/pipeline/rpi/pisp/pisp.cpp
+@@ -1797 +1797 @@ void PiSPCameraData::beOutputDequeue(FrameBuffer *buffer)
+-	int index;
++	int index = 0;
+diff --git a/src/libcamera/pipeline/rpi/vc4/vc4.cpp b/src/libcamera/pipeline/rpi/vc4/vc4.cpp
+index 1d6a7f7c..b9d5d895 100644
+--- a/src/libcamera/pipeline/rpi/vc4/vc4.cpp
++++ b/src/libcamera/pipeline/rpi/vc4/vc4.cpp
+@@ -753 +753 @@ void Vc4CameraData::unicamBufferDequeue(FrameBuffer *buffer)
+-	unsigned int index;
++	unsigned int index = 0;

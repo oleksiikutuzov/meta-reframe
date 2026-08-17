@@ -5,8 +5,9 @@ purpose-built Linux image for the open-source reFrame camera hardware. The
 first target is a Raspberry Pi Zero 2 W (64-bit) with Camera Module 3 (IMX708),
 I2C, and SPI enabled.
 
-The current milestone provides only a hardware bring-up image. It deliberately
-does **not** package the reFrame application, dashboard, or PiSugar software.
+The current milestone provides a hardware bring-up image with headless
+libcamera capture tools. It deliberately does **not** package the reFrame
+application, dashboard, or PiSugar software.
 
 ## Build environment
 
@@ -145,7 +146,15 @@ dmesg | grep -Ei 'imx708|camera|i2c|spi'
 systemd-analyze critical-chain
 ```
 
-Camera capture through libcamera and Picamera2 belongs to the next milestone.
+List cameras and perform a headless still capture with:
+
+```sh
+rpicam-hello --list-cameras
+rpicam-still -n --timeout 2000 -o /tmp/camera-test.jpg
+ls -lh /tmp/camera-test.jpg
+```
+
+Picamera2 integration belongs to the next milestone.
 
 ## Contributing
 
