@@ -5,9 +5,11 @@ purpose-built Linux image for the open-source reFrame camera hardware. The
 first target is a Raspberry Pi Zero 2 W (64-bit) with Camera Module 3 (IMX708),
 I2C, and SPI enabled.
 
-The current milestone provides a hardware bring-up image with headless
-libcamera and Picamera2 capture support. It deliberately does **not** package
-the reFrame application, dashboard, or PiSugar software.
+The current milestone adds the pinned reFrame camera application to the
+hardware bring-up image. The application runs as an unprivileged systemd
+service, keeps immutable code under `/usr/lib/reframe`, and stores settings and
+captured images under `/var/lib/reframe`. Display, dashboard, networking, and
+PiSugar integration remain disabled until their separate milestones.
 
 ## Build environment
 
@@ -171,6 +173,30 @@ finally:
 PY
 ls -lh /tmp/picamera2-test.jpg
 ```
+
+Verify the packaged application service and its persistent outputs with:
+
+```sh
+systemctl status reframe.service
+journalctl -u reframe.service -b --no-pager
+find /var/lib/reframe/photos -maxdepth 1 -type f -name '*.jpg' -print
+find /var/lib/reframe/dithered_photos -maxdepth 1 -type f -name '*.png' -print
+stat /var/lib/reframe/settings.json
+test ! -w /usr/lib/reframe/reframe.py
+```
+
+The service attempts Camera Module 3 HDR setup before opening Picamera2 and
+continues gracefully when that V4L2 control is unavailable. It takes one
+startup capture, writes the original JPEG and processed PNG as `reframe`, then
+waits for the PiSugar button on I2C. Reboot the board and confirm that settings
+and existing numbered captures persist and that a new capture uses the next
+number.
+
+The current upstream application expects `/dev/i2c-1` to exist. Without that
+PiSugar button bus, the startup capture still succeeds but the process exits
+afterward and systemd restarts it, producing repeated captures. Stop and disable
+`reframe.service` when testing without I2C until optional button handling is
+implemented in the PiSugar milestone.
 
 ## Contributing
 

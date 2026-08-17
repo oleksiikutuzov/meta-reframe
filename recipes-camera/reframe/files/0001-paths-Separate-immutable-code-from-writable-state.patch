@@ -1,0 +1,56 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Codex <codex@openai.com>
+Date: Mon, 17 Aug 2026 00:00:00 +0000
+Subject: [PATCH] paths: Separate immutable code from writable state
+
+Allow distributions to keep the application under a read-only prefix while
+placing photos, processed output, runtime data, and settings in persistent
+writable storage.
+
+Upstream-Status: Inappropriate [distribution path policy]
+---
+ reframe.py | 16 ++++++++++------
+ 1 file changed, 10 insertions(+), 6 deletions(-)
+
+diff --git a/reframe.py b/reframe.py
+index 2e6d620..e7d2e98 100755
+--- a/reframe.py
++++ b/reframe.py
+@@ -74,10 +74,14 @@ if os.path.exists(libdir):
+ logging.basicConfig(level=logging.INFO)
+ 
+ # Constants for file paths
+-BASE_PATH = os.path.dirname(os.path.realpath(__file__))
+-SAVE_PATH = os.path.join(BASE_PATH, "photos")
+-PROCESSED_PATH = os.path.join(BASE_PATH, "dithered_photos")
+-RUNTIME_PATH = os.path.join(BASE_PATH, ".runtime")
++BASE_PATH = os.environ.get(
++    "REFRAME_APP_PATH", os.path.dirname(os.path.realpath(__file__))
++)
++DATA_PATH = os.environ.get("REFRAME_DATA_PATH", BASE_PATH)
++SAVE_PATH = os.path.join(DATA_PATH, "photos")
++PROCESSED_PATH = os.path.join(DATA_PATH, "dithered_photos")
++RUNTIME_PATH = os.path.join(DATA_PATH, ".runtime")
++SETTINGS_PATH = os.path.join(DATA_PATH, "settings.json")
+ HDR_HELPER_PATH = os.path.join(BASE_PATH, "scripts", "enable_hdr.sh")
+ ORIGINAL_CAPTURE_EXTENSION = "jpg"
+ DISPLAY_IMAGE_WIDTH = 600
+@@ -1749,7 +1753,7 @@ def main():
+     global camera_system
+ 
+     startup_display = EInkDisplay()
+-    startup_settings_path = os.path.join(BASE_PATH, "settings.json")
++    startup_settings_path = SETTINGS_PATH
+     if _auto_display_enabled(startup_settings_path):
+         startup_display.prepare_async()
+ 
+@@ -1757,6 +1761,6 @@ def main():
+     # Picamera2 constructor opens the camera.
+     _enable_camera_hdr()
+-    camera_system = CameraSystem(eink_display=startup_display)
++    camera_system = CameraSystem(settings_path=SETTINGS_PATH, eink_display=startup_display)
+     logging.info("Camera system initialized")
+     logging.info("Taking startup photo...")
+     startup_status = "Camera initialized; startup capture failed"
+-- 
+2.50.1
