@@ -4,3 +4,6 @@
 /meta-raspberrypi/
 /openembedded-core/
 
+# Local Python validation artifacts
+__pycache__/
+*.py[cod]

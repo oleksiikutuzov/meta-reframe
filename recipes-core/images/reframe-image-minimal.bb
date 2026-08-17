@@ -21,4 +21,5 @@ IMAGE_INSTALL += " \
     libcamera-apps \
     python3-picamera2 \
     reframe \
+    reframe-network \
 "
