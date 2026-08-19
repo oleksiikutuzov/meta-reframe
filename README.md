@@ -5,10 +5,11 @@ purpose-built Linux image for the open-source reFrame camera hardware. The
 first target is a Raspberry Pi Zero 2 W (64-bit) with Camera Module 3 (IMX708),
 I2C, and SPI enabled.
 
-The current milestone adds Wi-Fi provisioning to the packaged reFrame camera
-image. NetworkManager first tries saved networks and falls back to a temporary
-`reFrame-Setup` access point with a browser-based setup page. Display, dashboard,
-and PiSugar integration remain disabled until their separate milestones.
+The current milestone integrates PiSugar 3 power and RTC support with the
+packaged reFrame camera image. A pinned, source-built PiSugar service exposes
+only local control sockets, preserves time across offline boots, and completes
+board shutdown after systemd powers off Linux. Display and dashboard integration
+remain disabled until their separate milestones.
 
 ## Build environment
 
@@ -128,10 +129,11 @@ sudo bmaptool copy \
     /dev/sdX
 ```
 
-The 2026-08-17 build completed all 6,702 tasks successfully. This confirms the
-metadata, package QA, root filesystem, and WIC image build. The libcamera
-capture path has been validated on physical hardware; repeat the Picamera2 test
-below after deploying this milestone.
+The 2026-08-19 build completed all 7,269 tasks successfully. This confirms the
+metadata, PiSugar package QA, root filesystem, SPDX/SBOM generation, and WIC
+image build. The libcamera capture path and PiSugar I2C addresses have been
+validated on physical hardware; repeat the service-level tests below after
+deploying this milestone.
 
 The `Yocto sanity` GitHub Actions workflow performs fast kas and BitBake metadata
 checks for pull requests and pushes to `main`. Run the separate `Yocto full layer
@@ -192,11 +194,41 @@ waits for the PiSugar button on I2C. Reboot the board and confirm that settings
 and existing numbered captures persist and that a new capture uses the next
 number.
 
-The current upstream application expects `/dev/i2c-1` to exist. Without that
-PiSugar button bus, the startup capture still succeeds but the process exits
-afterward and systemd restarts it, producing repeated captures. Stop and disable
-`reframe.service` when testing without I2C until optional button handling is
-implemented in the PiSugar milestone.
+The packaged application polls the PiSugar power-button state directly over
+I2C, matching the original reFrame hardware design. Without PiSugar hardware,
+the startup capture still succeeds; button read failures are logged and retried.
+
+## PiSugar power and RTC
+
+The image builds `pisugar-server` and `pisugar-poweroff` from pinned Rust
+sources. `pisugar-server` is configured for PiSugar 3 and exposes a Unix socket
+at `/run/pisugar/pisugar-server.sock` plus a loopback-only compatibility port at
+`127.0.0.1:8423`. It is not reachable from Wi-Fi. The layer disables shell
+actions from programmable-button tap events. reFrame independently measures
+the power-button press duration and captures only on a short press; long presses
+remain reserved for PiSugar shutdown behavior.
+
+At boot, `pisugar-rtc-restore.service` restores a plausible UTC value from the
+PiSugar RTC before reFrame starts. After network time synchronization,
+`pisugar-rtc-update.service` writes UTC back to the RTC. The server requests an
+orderly shutdown after 30 seconds below 5 percent charge, and
+`pisugar-poweroff.service` tells the board to cut power after Linux shuts down.
+
+Inspect the integration on the target with:
+
+```sh
+systemctl status pisugar-server pisugar-rtc-restore pisugar-rtc-update
+systemctl status pisugar-poweroff
+printf 'get model\nget battery\nget rtc_time\nget anti_mistouch\n' \
+    | nc -U -w 2 -q 0 /run/pisugar/pisugar-server.sock
+ss -lntp | grep 8423
+journalctl -u pisugar-server -u pisugar-rtc-restore -b --no-pager
+```
+
+The socket query should report PiSugar 3 data, `anti_mistouch: false`, and a
+plausible RTC time. Port 8423 must listen only on `127.0.0.1`. Test low-battery
+and final power-cut behavior with the device attended; do not deliberately
+deep-discharge the battery.
 
 ## Wi-Fi provisioning
 
