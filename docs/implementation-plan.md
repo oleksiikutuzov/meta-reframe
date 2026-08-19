@@ -54,7 +54,19 @@ outside the application recipe. Do not embed credentials or assume `wlan0`.
 reconnects after reboot and access-point loss, advertises `reframe.local`, and
 retains UART recovery access when networking is unavailable.
 
-### v0.5 — Spectra 6 display
+### v0.5 — PiSugar power integration
+
+Build `pisugar-server` and `pisugar-poweroff` from pinned source without vendor
+installers. Integrate the PiSugar 3 model, battery state, power button,
+anti-mistouch behavior, safe battery poweroff, and RTC. Expose management only
+over a local Unix socket and loopback TCP; prefer standard Linux RTC interfaces
+where supported.
+
+**Exit gate:** Model and battery queries work, one-button power-on and shutdown
+are reliable, time survives loss of network time, and repeated power cycles do
+not corrupt persistent reFrame data.
+
+### v0.6 — Spectra 6 display
 
 Package the bundled Waveshare driver with reFrame and validate SPI/GPIO panel
 control independently before enabling application-driven refresh.
@@ -63,7 +75,7 @@ control independently before enabling application-driven refresh.
 image, repeated refreshes complete without service crashes, and a reboot restores
 normal capture-to-display operation.
 
-### v0.6 — Dashboard
+### v0.7 — Dashboard
 
 Add the required FastAPI, Uvicorn, HTTPX, Aiofiles, and QR recipes plus
 layer-owned dashboard services. Keep upstream self-update disabled.
@@ -71,16 +83,6 @@ layer-owned dashboard services. Keep upstream self-update disabled.
 **Exit gate:** Browsing, original download, display selection, settings
 persistence, and QR/access views work over the network without disrupting the
 camera service.
-
-### v0.7 — PiSugar power integration
-
-Build `pisugar-server` from source without vendor installers. Integrate the
-PiSugar 3 model, battery state, power button, anti-mistouch behavior, and RTC;
-prefer standard Linux RTC interfaces where supported.
-
-**Exit gate:** Model and battery queries work, one-button power-on and shutdown
-are reliable, time survives loss of network time, and repeated power cycles do
-not corrupt persistent reFrame data.
 
 ### v1.0 — Production appliance
 

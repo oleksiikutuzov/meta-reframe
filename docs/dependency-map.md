@@ -54,9 +54,16 @@ reFrame
 |
 +-- PiSugar 3
     +-- I2C
-    +-- pisugar-server
-    +-- RTC
-    +-- power-button configuration
+    +-- pisugar-server (pinned Rust source build)
+    |   +-- Unix socket under /run/pisugar
+    |   +-- loopback-only TCP compatibility API
+    |   +-- battery, RTC, shutdown, and command APIs
+    +-- pisugar-poweroff
+    +-- reframe-pisugar
+        +-- boot-time RTC restore before reFrame
+        +-- RTC update after network time synchronization
+        +-- low-battery shutdown policy
+    +-- reFrame direct power-button state polling
 ```
 
 ## Integration rules
@@ -74,3 +81,8 @@ reFrame
 - Keep the system-wide dnsmasq service disabled. NetworkManager owns a private
   dnsmasq process for each IPv4 shared connection, and a second daemon will
   collide on the hotspot DNS socket.
+- Keep PiSugar control APIs local to the device. Do not enable its web server or
+  bind its TCP protocol to a non-loopback address.
+- Keep capture-button policy in reFrame. Its direct I2C access is limited to
+  reading the physical power-button state; PiSugar tap actions must not execute
+  arbitrary shell commands.
