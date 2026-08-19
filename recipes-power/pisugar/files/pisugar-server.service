@@ -1,0 +1,18 @@
+[Unit]
+Description=PiSugar battery and RTC server
+After=systemd-modules-load.service
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/pisugar-server --model "PiSugar 3" --syslog --config /etc/pisugar-server/config.json --uds /run/pisugar/pisugar-server.sock --uds-mode 0660 --tcp 127.0.0.1:8423
+Restart=on-failure
+RestartSec=5
+RuntimeDirectory=pisugar
+RuntimeDirectoryMode=0750
+
+# Hardware access and low-battery shutdown require root. Keep all APIs local.
+User=root
+Group=i2c
+
+[Install]
+WantedBy=multi-user.target

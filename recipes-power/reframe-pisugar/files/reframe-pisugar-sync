@@ -1,0 +1,109 @@
+#!/bin/bash
+set -u
+
+PISUGAR_SOCKET="/run/pisugar/pisugar-server.sock"
+LAST_NETWORK_SYNC_PATH="/var/lib/reframe/rtc-last-network-sync"
+MIN_VALID_RTC_EPOCH="1704067200"
+MAX_VALID_RTC_EPOCH="4102444800"
+MAX_RTC_ADVANCE_SECONDS="158112000"
+
+pisugar_command() {
+    printf '%s\n' "$1" | nc -U -w 2 -q 0 "$PISUGAR_SOCKET"
+}
+
+wait_for_pisugar() {
+    local attempt
+    for attempt in 1 2 3 4 5 6 7 8; do
+        if pisugar_command "get model" >/dev/null 2>&1; then
+            return 0
+        fi
+        sleep 1
+    done
+    echo "PiSugar sync skipped: pisugar-server did not become ready" >&2
+    return 1
+}
+
+require_utc() {
+    local timezone
+    timezone="$(timedatectl show -p Timezone --value 2>/dev/null || true)"
+    if [ "$timezone" != "UTC" ] && [ "$timezone" != "Etc/UTC" ]; then
+        echo "PiSugar RTC sync skipped: timezone is ${timezone:-unknown}, not UTC" >&2
+        return 1
+    fi
+}
+
+configure_one_press_power_on() {
+    local current response
+    current="$(pisugar_command "get anti_mistouch" 2>/dev/null || true)"
+    if [ "$current" = "anti_mistouch: false" ] || [ "$current" = "false" ]; then
+        return 0
+    fi
+    response="$(pisugar_command "set_anti_mistouch false" 2>/dev/null || true)"
+    if [[ "$response" != *"done"* && "$response" != *"Done"* ]]; then
+        echo "Failed to configure PiSugar one-press power-on: ${response:-no response}" >&2
+        return 1
+    fi
+}
+
+restore_from_rtc() {
+    local response rtc_time rtc_epoch last_sync_epoch
+    wait_for_pisugar || return 0
+    configure_one_press_power_on || true
+    require_utc || return 0
+
+    response="$(pisugar_command "get rtc_time" 2>/dev/null || true)"
+    rtc_time="${response#*:}"
+    rtc_time="${rtc_time# }"
+    rtc_epoch="$(date --date="$rtc_time" +%s 2>/dev/null || true)"
+    if [ -z "$rtc_epoch" ] || [ "$rtc_epoch" -lt "$MIN_VALID_RTC_EPOCH" ] \
+        || [ "$rtc_epoch" -ge "$MAX_VALID_RTC_EPOCH" ]; then
+        echo "PiSugar RTC restore skipped: RTC is missing or uninitialized" >&2
+        return 0
+    fi
+
+    if [ -r "$LAST_NETWORK_SYNC_PATH" ]; then
+        last_sync_epoch="$(head -n 1 "$LAST_NETWORK_SYNC_PATH" 2>/dev/null || true)"
+        if [[ "$last_sync_epoch" =~ ^[0-9]+$ ]] \
+            && { [ "$rtc_epoch" -lt $((last_sync_epoch - 300)) ] \
+                || [ "$rtc_epoch" -gt $((last_sync_epoch + MAX_RTC_ADVANCE_SECONDS)) ]; }; then
+            echo "PiSugar RTC restore skipped: RTC is outside the trusted range" >&2
+            return 0
+        fi
+    fi
+
+    response="$(pisugar_command "rtc_rtc2pi" 2>/dev/null || true)"
+    if [[ "$response" != *"done"* && "$response" != *"Done"* ]]; then
+        echo "PiSugar RTC-to-system sync failed: ${response:-no response}" >&2
+        return 1
+    fi
+}
+
+update_rtc() {
+    local attempt response network_epoch marker_tmp
+    require_utc || return 0
+    wait_for_pisugar || return 0
+    for attempt in $(seq 1 120); do
+        if [ "$(timedatectl show -p NTPSynchronized --value 2>/dev/null)" = "yes" ]; then
+            response="$(pisugar_command "rtc_pi2rtc" 2>/dev/null || true)"
+            if [[ "$response" != *"done"* && "$response" != *"Done"* ]]; then
+                echo "System-to-PiSugar RTC sync failed: ${response:-no response}" >&2
+                return 1
+            fi
+            network_epoch="$(date +%s)"
+            marker_tmp="${LAST_NETWORK_SYNC_PATH}.tmp.$$"
+            install -d -m 0755 "$(dirname "$LAST_NETWORK_SYNC_PATH")"
+            printf '%s\n' "$network_epoch" > "$marker_tmp"
+            chmod 0644 "$marker_tmp"
+            mv "$marker_tmp" "$LAST_NETWORK_SYNC_PATH"
+            return 0
+        fi
+        sleep 5
+    done
+    echo "PiSugar RTC update skipped: network time did not synchronize" >&2
+}
+
+case "${1:-}" in
+    restore) restore_from_rtc ;;
+    update) update_rtc ;;
+    *) echo "Usage: $0 {restore|update}" >&2; exit 2 ;;
+esac

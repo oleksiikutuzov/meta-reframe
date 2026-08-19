@@ -1,0 +1,31 @@
+From 0000000000000000000000000000000000000001 Mon Sep 17 00:00:00 2001
+From: Oleksii Kutuzov <oleksii.kutuzov@icloud.com>
+Date: Wed, 19 Aug 2026 21:45:00 +0000
+Subject: [PATCH] Cargo.lock: sync workspace package versions
+
+The 2.3.2 release updated each workspace manifest but retained the 2.3.1
+workspace package versions in Cargo.lock. Newer Cargo therefore refuses to
+build with --frozen. Synchronize the four local package entries with their
+manifests; third-party dependency resolution is unchanged.
+
+Upstream-Status: Pending
+---
+ Cargo.lock | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/Cargo.lock b/Cargo.lock
+index 6a144de..4332af5 100644
+--- a/Cargo.lock
++++ b/Cargo.lock
+@@ -1965 +1965 @@ name = "pisugar-core"
+-version = "2.3.1"
++version = "2.3.2"
+@@ -1980 +1980 @@ name = "pisugar-poweroff"
+-version = "2.3.1"
++version = "2.3.2"
+@@ -1991 +1991 @@ name = "pisugar-programmer"
+-version = "2.3.1"
++version = "2.3.2"
+@@ -2002 +2002 @@ name = "pisugar-server"
+-version = "2.3.1"
++version = "2.3.2"
