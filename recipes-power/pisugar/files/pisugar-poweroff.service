@@ -1,0 +1,14 @@
+[Unit]
+Description=Power off the PiSugar battery after Linux shutdown
+DefaultDependencies=no
+Conflicts=reboot.target
+Before=poweroff.target halt.target shutdown.target
+Requires=poweroff.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/pisugar-poweroff --model "PiSugar 3" --countdown 3
+RemainAfterExit=yes
+
+[Install]
+WantedBy=shutdown.target

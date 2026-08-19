@@ -1,0 +1,12 @@
+[Unit]
+Description=Update the PiSugar RTC after network time synchronization
+Wants=pisugar-server.service systemd-timesyncd.service network-online.target
+After=pisugar-server.service systemd-timesyncd.service network-online.target pisugar-rtc-restore.service
+
+[Service]
+Type=simple
+ExecStart=/usr/libexec/reframe-pisugar-sync update
+TimeoutStopSec=5
+
+[Install]
+WantedBy=multi-user.target

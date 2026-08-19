@@ -20,6 +20,8 @@ IMAGE_INSTALL += " \
     ${REFRAME_DEBUG_PACKAGES} \
     libcamera-apps \
     python3-picamera2 \
+    pisugar-power-manager-rs \
     reframe \
     reframe-network \
+    reframe-pisugar \
 "
