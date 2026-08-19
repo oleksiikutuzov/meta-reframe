@@ -35,6 +35,15 @@ do_install() {
 
     install -d ${D}${sysconfdir}/NetworkManager/dnsmasq-shared.d
     install -m 0644 ${UNPACKDIR}/captive-portal.conf ${D}${sysconfdir}/NetworkManager/dnsmasq-shared.d/50-reframe-captive-portal.conf
+
+    # NetworkManager owns all interfaces in this appliance. The networkd wait
+    # helper otherwise waits two minutes for an interface networkd never owns
+    # and permanently leaves an otherwise healthy boot in degraded state.
+    install -d ${D}${sysconfdir}/systemd/system
+    ln -s /dev/null ${D}${sysconfdir}/systemd/system/systemd-networkd-wait-online.service
 }
 
-FILES:${PN} += "${sysconfdir}/NetworkManager/dnsmasq-shared.d/50-reframe-captive-portal.conf"
+FILES:${PN} += " \
+    ${sysconfdir}/NetworkManager/dnsmasq-shared.d/50-reframe-captive-portal.conf \
+    ${sysconfdir}/systemd/system/systemd-networkd-wait-online.service \
+"
