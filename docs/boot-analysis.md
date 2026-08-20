@@ -27,14 +27,24 @@ The layer ports the applicable host configuration from that commit:
 - the CPU governor is set to `performance` for startup imports and first
   capture, then restored to `ondemand` or `schedutil` after `READY=1` and on
   service stop;
+- PiSugar RTC restoration starts alongside reFrame instead of blocking camera
+  initialization; and
+- generic-image networkd, Ofono, rpcbind, and Bluetooth units are masked because
+  NetworkManager owns networking and the appliance has no modem, RPC, or
+  Bluetooth role;
 - unused Bluetooth, audio, splash, HDMI/TV, display, fan, EEPROM, and boot-delay
   firmware paths are disabled; and
 - release cmdlines use `quiet loglevel=3` while debug images retain UART console
   output as a recovery requirement.
 
-The upstream `Before=basic.target` ordering is intentionally not copied.
-reFrame must follow the PiSugar RTC restore service, whose normal systemd
-dependencies would conflict with placing reFrame before `basic.target`.
+The upstream `Before=basic.target` ordering is intentionally not copied. The
+camera still starts after local filesystems and udev trigger so its state paths
+and media devices exist. RTC restoration is a soft dependency and runs in
+parallel; consequently, the first photo can be captured before a valid PiSugar
+RTC adjusts the system clock, but capture numbering and image contents are not
+affected. The oneshot remains active after successful completion so a later
+camera-service restart cannot restore the RTC repeatedly and move system time
+backwards.
 
 ## Build validation
 
@@ -52,6 +62,20 @@ Generated `config.txt` contained the intended effective values, including
 `console=serial0,115200` and omitted release-only quiet settings.
 
 ## Target measurements
+
+An initial live-device A/B test on 2026-08-20 produced:
+
+| Event | Ordered after RTC | Parallel RTC | Improvement |
+| --- | ---: | ---: | ---: |
+| reFrame service start | 12.99 s | 9.12 s | 3.87 s |
+| Startup capture begins | 18.69 s | 16.00 s | 2.69 s |
+| Startup capture completes | 20.10 s | 17.41 s | 2.69 s |
+
+The parallel boot saved 2.69 seconds to the first completed photo. The image
+was saved successfully, Wi-Fi reconnected, RTC restore completed concurrently
+at 12.08 seconds, all masked units remained inactive, and systemd reported no
+failed units. This is a warm A/B validation on one device; retain the cold-boot
+repeatability test below.
 
 After flashing, collect three cold boots and report median values rather than a
 single best run:
