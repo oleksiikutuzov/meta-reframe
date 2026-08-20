@@ -160,6 +160,15 @@ and no OTA or package-feed upgrade path is installed. Updating currently means
 backing up `/var/lib/reframe`, building a replacement image, and reflashing the
 SD card.
 
+## Boot-speed validation
+
+The layer includes the application optimizations from upstream commit
+`50aef477375a8c40da5e0230748a1d2b89595f3b` and ports its applicable headless
+boot settings. Follow `docs/boot-analysis.md` after flashing. In particular,
+confirm the startup CPU governor returns from `performance` to `ondemand` or
+`schedutil`, UART remains usable in the debug image, and removing the global
+udev-settle wait does not introduce camera or PiSugar races.
+
 ## PiSugar 3 validation
 
 Initial hardware inspection found the kernel I2C adapters in sysfs but no

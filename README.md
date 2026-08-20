@@ -75,6 +75,10 @@ ENABLE_UART = "${@oe.utils.vartrue('DEBUG_BUILD', '1', '0', d)}"
 VIDEO_CAMERA = "1"
 RASPBERRYPI_CAMERA_V3 = "1"
 hostname:pn-base-files = "reframe"
+DISABLE_SPLASH = "1"
+DISABLE_RPI_BOOT_LOGO = "1"
+CMDLINE_DEBUG = "${@oe.utils.vartrue('DEBUG_BUILD', '', 'quiet loglevel=3', d)}"
+RPI_EXTRA_CONFIG = "dtoverlay=disable-bt\nhdmi_blanking=2\nboot_delay=0\ndisplay_auto_detect=0\ndisable_poe_fan=1\nforce_eeprom_read=0\nenable_tvout=0"
 LICENSE_FLAGS_ACCEPTED += "synaptics-killswitch"
 ```
 
@@ -88,6 +92,12 @@ root password for that console, and the `i2c-tools`, `v4l-utils`, and
 are omitted and UART is disabled. This standard OpenEmbedded variable also
 selects debug compiler optimization, so unset it or set it to `0` for release
 builds.
+
+The headless settings skip unused firmware probes. A layer append also forces
+HDMI audio off after the Raspberry Pi machine recipe enables it. Release builds
+add `quiet loglevel=3`; debug builds intentionally retain the serial kernel
+console for recovery. See `docs/boot-analysis.md` for the service-side latency
+changes and measurements to collect on hardware.
 
 ## Serial bring-up console
 
