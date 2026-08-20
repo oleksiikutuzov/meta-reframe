@@ -107,6 +107,33 @@ fallback interval.
 - Confirm recovery after a wrong password, AP loss, and repeated cold boots.
 - Record the exact Raspberry Pi board revision and final tested commit.
 
+## Dashboard validation
+
+The networking service remains the only process exposed on TCP port 80. While
+the setup AP is active it serves Wi-Fi provisioning and captive-portal probes;
+after a client connection is active it proxies requests to the dashboard on
+loopback. The dashboard and camera hardware API must not be exposed directly.
+
+After provisioning Wi-Fi, run:
+
+```sh
+systemctl is-active reframe reframe-dashboard reframe-network
+ss -lntp | grep -E ':80|:8000|:8077'
+curl -fsS http://127.0.0.1:8000/ >/dev/null
+curl -fsS http://reframe.local/ >/dev/null
+```
+
+Expected listeners are port 80 on all addresses and ports 8000 and 8077 on
+loopback only. In a browser at `http://reframe.local`, confirm that the gallery
+loads, a new capture appears, originals and processed images download, settings
+survive a dashboard restart and reboot, and switching back to setup mode still
+shows provisioning rather than the dashboard. Display-selection and QR-to-panel
+actions remain hardware-gated until the Spectra 6 milestone.
+
+The dashboard is intentionally unauthenticated and should be used only on a
+trusted LAN. Application self-update is unavailable in the immutable image;
+software updates remain image-controlled.
+
 ## PiSugar 3 validation
 
 Initial hardware inspection found the kernel I2C adapters in sysfs but no
