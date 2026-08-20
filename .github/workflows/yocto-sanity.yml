@@ -66,10 +66,12 @@ jobs:
 
             bitbake-layers show-recipes reframe-image-minimal | tee recipes.txt
             grep -Eq "^reframe-image-minimal:" recipes.txt
+            bitbake-layers show-recipes reframe-app | tee app-recipes.txt
+            grep -Eq "^reframe-app:" app-recipes.txt
 
             bitbake -e reframe-image-minimal > bitbake.env
             for expected in \
-              "MACHINE=\"raspberrypi0-2w-64\"" \
+              "MACHINE=\"reframe\"" \
               "DEBUG_BUILD=\"1\"" \
               "INIT_MANAGER=\"systemd\"" \
               "ENABLE_I2C=\"1\"" \
@@ -77,7 +79,11 @@ jobs:
               "ENABLE_UART=\"1\"" \
               "SERIAL_CONSOLES=\"115200;ttyS0\"" \
               "VIDEO_CAMERA=\"1\"" \
-              "RASPBERRYPI_CAMERA_V3=\"1\""; do
+              "RASPBERRYPI_CAMERA_V3=\"1\"" \
+              "DISABLE_SPLASH=\"1\"" \
+              "DISABLE_RPI_BOOT_LOGO=\"1\"" \
+              "CMDLINE_DEBUG=\"\"" \
+              "RPI_EXTRA_CONFIG=\"dtoverlay=disable-bt\\nhdmi_blanking=2\\nboot_delay=0\\ndisplay_auto_detect=0\\ndisable_poe_fan=1\\nforce_eeprom_read=0\\nenable_tvout=0\""; do
               grep -Fqx "${expected}" bitbake.env
             done
           '

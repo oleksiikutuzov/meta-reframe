@@ -21,7 +21,28 @@ IMAGE_INSTALL += " \
     libcamera-apps \
     python3-picamera2 \
     pisugar-power-manager-rs \
-    reframe \
+    reframe-app \
     reframe-network \
     reframe-pisugar \
 "
+
+# These generic-image services have no role on the appliance. Apply masks only
+# after package postinst scripts have installed/enabled their units; shipping
+# the masks from an ordinary package makes systemd's enable postinst fail.
+mask_reframe_unused_services() {
+    install -d ${IMAGE_ROOTFS}${sysconfdir}/systemd/system
+    for unit in \
+        systemd-networkd.service \
+        systemd-networkd.socket \
+        systemd-networkd-varlink.socket \
+        systemd-networkd-resolve-hook.socket \
+        ofono.service \
+        rpcbind.service \
+        rpcbind.socket \
+        bluetooth.service \
+        hciuart.service \
+    ; do
+        ln -snf /dev/null ${IMAGE_ROOTFS}${sysconfdir}/systemd/system/$unit
+    done
+}
+ROOTFS_POSTPROCESS_COMMAND += "mask_reframe_unused_services; "

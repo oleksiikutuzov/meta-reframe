@@ -1,0 +1,56 @@
+From 0000000000000000000000000000000000000002 Mon Sep 17 00:00:00 2001
+From: Codex <codex@openai.com>
+Date: Wed, 19 Aug 2026 23:45:00 +0000
+Subject: [PATCH] dashboard: Separate immutable code from state
+
+Use the same application and persistent-data environment variables as the
+camera service so the dashboard can run from /usr while sharing settings and
+photos under /var/lib/reframe.
+
+Upstream-Status: Inappropriate [distribution path policy]
+---
+ dashboard.py | 17 ++++++++++-------
+ 1 file changed, 10 insertions(+), 7 deletions(-)
+
+diff --git a/dashboard.py b/dashboard.py
+index 1089bf3..35ccf15 100644
+--- a/dashboard.py
++++ b/dashboard.py
+@@ -26,7 +26,10 @@ CAMERA_AVAILABLE = False
+-BASE_PATH = os.path.dirname(os.path.realpath(__file__))
+-PHOTOS_PATH = os.path.join(BASE_PATH, "photos")
+-DITHERED_PHOTOS_PATH = os.path.join(BASE_PATH, "dithered_photos")
+-SETTINGS_PATH = os.path.join(BASE_PATH, "settings.json")
++BASE_PATH = os.environ.get(
++    "REFRAME_APP_PATH", os.path.dirname(os.path.realpath(__file__))
++)
++DATA_PATH = os.environ.get("REFRAME_DATA_PATH", BASE_PATH)
++PHOTOS_PATH = os.path.join(DATA_PATH, "photos")
++DITHERED_PHOTOS_PATH = os.path.join(DATA_PATH, "dithered_photos")
++SETTINGS_PATH = os.path.join(DATA_PATH, "settings.json")
+ USER_DATA_PATHS = ["settings.json", "photos", "dithered_photos"]
+ UPDATE_HELPER_PATH = "/usr/local/sbin/reframe-apply-update"
+-UPDATE_PENDING_PATH = os.path.join(BASE_PATH, ".runtime", "update_pending")
++UPDATE_PENDING_PATH = os.path.join(DATA_PATH, ".runtime", "update_pending")
+@@ -1681,9 +1684,9 @@ async def dashboard():
+                 <div class="settings-section settings-updates">
+                     <h3>software updates</h3>
+                     <div class="setting-group">
+-                        <button class="button" id="update-check-btn" onclick="checkForUpdates()" type="button">check for updates</button>
+-                        <button class="button" id="update-install-btn" onclick="installUpdate()" type="button" style="display: none;">install update</button>
+-                        <div class="setting-help" id="update-status">Updates code, dependencies, and service files while preserving settings and photos.</div>
++                        <button class="button" id="update-check-btn" type="button" disabled>updates managed by system image</button>
++                        <button class="button" id="update-install-btn" type="button" disabled style="display: none;">install update</button>
++                        <div class="setting-help" id="update-status">Software updates are managed by the reFrame system image.</div>
+                     </div>
+                 </div>
+ 
+@@ -2292,7 +2295,7 @@ async def dashboard():
+                 document.getElementById('show-dashboard-qr-on-wifi-connect').value = settings.system.show_dashboard_qr_on_wifi_connect !== false ? 'true' : 'false';
+                 const exportSettings = settings.exports || {};
+                 document.getElementById('upscale-dithered-2x').value = exportSettings.upscale_dithered_2x ? 'true' : 'false';
+-                document.getElementById('update-status').textContent = 'Updates code, dependencies, and service files while preserving settings and photos.';
++                document.getElementById('update-status').textContent = 'Software updates are managed by the reFrame system image.';
+                 document.getElementById('update-install-btn').style.display = 'none';
+ 
+                 const arenaSettings = (settings.extensions && settings.extensions.arena) || {};

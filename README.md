@@ -5,11 +5,24 @@ purpose-built Linux image for the open-source reFrame camera hardware. The
 first target is a Raspberry Pi Zero 2 W (64-bit) with Camera Module 3 (IMX708),
 I2C, and SPI enabled.
 
-The current milestone integrates PiSugar 3 power and RTC support with the
-packaged reFrame camera image. A pinned, source-built PiSugar service exposes
-only local control sockets, preserves time across offline boots, and completes
-board shutdown after systemd powers off Linux. Display and dashboard integration
-remain disabled until their separate milestones.
+The current image integrates the camera application, Wi-Fi provisioning,
+loopback-backed dashboard, and PiSugar 3 power and RTC support. A pinned,
+source-built PiSugar service exposes only local control sockets, preserves time
+across offline boots, and completes board shutdown after systemd powers off
+Linux. Spectra display integration remains a separate milestone.
+
+## Software update policy
+
+There are currently **no in-system software updates**. The dashboard cannot
+install updates, and the image provides no OTA client, package-feed upgrade, or
+supported Git-based self-update path. Its update control is intentionally
+disabled and reports that updates are managed by the reFrame system image.
+
+To update a device today, build a new Yocto image and write it to the SD card.
+Back up anything needed from `/var/lib/reframe` first because reflashing the
+whole card can erase photos and settings. A future updater must be designed as
+an image-level, authenticated and signed mechanism with failure recovery; the
+upstream application's Git updater must not be enabled on this appliance.
 
 ## Build environment
 
@@ -50,8 +63,10 @@ KAS_WORK_DIR="$PWD" kas shell meta-reframe/kas/reframe.yml
 
 ## Raspberry Pi Zero 2 W configuration
 
-The kas configuration selects `raspberrypi0-2w-64`, systemd, I2C, SPI, and the
-Camera Module 3/IMX708 overlay. Its effective `local.conf` settings are:
+The kas configuration selects the layer-owned `reframe` machine. That machine
+directly requires meta-raspberrypi's `raspberrypi0-2w-64` definition and owns
+the complete appliance configuration, including development policy, hardware,
+hostname, firmware licence acceptance, and headless speed settings:
 
 ```sh
 DEBUG_BUILD = "1"
@@ -62,6 +77,10 @@ ENABLE_UART = "${@oe.utils.vartrue('DEBUG_BUILD', '1', '0', d)}"
 VIDEO_CAMERA = "1"
 RASPBERRYPI_CAMERA_V3 = "1"
 hostname:pn-base-files = "reframe"
+DISABLE_SPLASH = "1"
+DISABLE_RPI_BOOT_LOGO = "1"
+CMDLINE_DEBUG = "${@oe.utils.vartrue('DEBUG_BUILD', '', 'quiet loglevel=3', d)}"
+RPI_EXTRA_CONFIG = "dtoverlay=disable-bt\nhdmi_blanking=2\nboot_delay=0\ndisplay_auto_detect=0\ndisable_poe_fan=1\nforce_eeprom_read=0\nenable_tvout=0"
 LICENSE_FLAGS_ACCEPTED += "synaptics-killswitch"
 ```
 
@@ -75,6 +94,17 @@ root password for that console, and the `i2c-tools`, `v4l-utils`, and
 are omitted and UART is disabled. This standard OpenEmbedded variable also
 selects debug compiler optimization, so unset it or set it to `0` for release
 builds.
+
+The headless settings skip unused firmware probes. A layer append also forces
+HDMI audio off after the Raspberry Pi machine recipe enables it. Release builds
+add `quiet loglevel=3`; debug builds intentionally retain the serial kernel
+console for recovery. See `docs/boot-analysis.md` for the service-side latency
+changes and measurements to collect on hardware.
+
+The application recipe uses package name `reframe-app`. It cannot use package
+name `reframe` because the machine name is an active BitBake override; the
+recipe retains `reframe` as a compatibility provider while systemd service and
+user-facing names remain unchanged.
 
 ## Serial bring-up console
 
@@ -110,10 +140,9 @@ KAS_WORK_DIR="$PWD" kas shell meta-reframe/kas/reframe.yml -c 'bitbake-layers sh
 KAS_WORK_DIR="$PWD" kas shell meta-reframe/kas/reframe.yml -c 'bitbake -p reframe-image-minimal'
 ```
 
-Artifacts are written below
-`build/tmp/deploy/images/raspberrypi0-2w-64/`. The tested configuration produces the
-stable symlink
-`reframe-image-minimal-raspberrypi0-2w-64.rootfs.wic`, a compressed `.wic.bz2`
+Artifacts are written below `build/tmp/deploy/images/reframe/`. The configured
+build produces the stable symlink
+`reframe-image-minimal-reframe.rootfs.wic`, a compressed `.wic.bz2`
 variant, and the matching `.wic.bmap` file.
 
 To flash with Balena Etcher, select the uncompressed `.wic` file as the image,
@@ -125,15 +154,19 @@ compressed image with:
 
 ```sh
 sudo bmaptool copy \
-    build/tmp/deploy/images/raspberrypi0-2w-64/reframe-image-minimal-raspberrypi0-2w-64.rootfs.wic.bz2 \
+    build/tmp/deploy/images/reframe/reframe-image-minimal-reframe.rootfs.wic.bz2 \
     /dev/sdX
 ```
 
-The 2026-08-19 build completed all 7,269 tasks successfully. This confirms the
-metadata, PiSugar package QA, root filesystem, SPDX/SBOM generation, and WIC
-image build. The libcamera capture path and PiSugar I2C addresses have been
-validated on physical hardware; repeat the service-level tests below after
-deploying this milestone.
+The 2026-08-20 pre-machine build completed all 10,405 tasks successfully. This
+confirms the metadata, PiSugar package QA, root filesystem, SPDX/SBOM
+generation, and WIC image build for the inherited board configuration. A
+subsequent `MACHINE = "reframe"` build passed parsing and image recipe QA, then
+was stopped by the operator during the uncached kernel-module build. Complete
+one full custom-machine build before treating the transition as image-validated.
+The libcamera capture path and PiSugar I2C addresses have been validated on
+physical hardware; repeat the service-level tests below after deploying this
+milestone.
 
 The `Yocto sanity` GitHub Actions workflow performs fast kas and BitBake metadata
 checks for pull requests and pushes to `main`. Run the separate `Yocto full layer
@@ -232,6 +265,27 @@ deep-discharge the battery.
 
 ## Wi-Fi provisioning
 
+Wi-Fi can be prepared before the first boot. After writing the image, place a
+file named `reframe-wifi.json` in the top level of the computer-visible boot
+partition:
+
+```json
+{
+  "ssid": "My Wi-Fi",
+  "password": "correct horse battery staple",
+  "hidden": false
+}
+```
+
+`password` may be omitted or empty for an open network, and `hidden` defaults
+to `false`. SSIDs and passwords may contain spaces and punctuation because the
+file is parsed as JSON, not as shell code. On boot, reFrame creates a persistent
+NetworkManager profile and erases the plaintext JSON file. Remove the card
+safely after copying it and provision it in a trusted environment: until first
+boot consumes the file, anyone who can read the FAT boot partition can see the
+password. If parsing fails, the credentials are erased and a non-secret
+`reframe-wifi.error.txt` explanation is written beside them.
+
 On first boot, or whenever no saved Wi-Fi connection can be activated, join the
 open `reFrame-Setup` access point. Phones and laptops should open the Wi-Fi
 setup page as a captive portal; `http://10.42.0.1` remains the manual fallback.
@@ -249,10 +303,10 @@ required before treating that page as a production management interface.
 Inspect or recover networking over UART with:
 
 ```sh
-systemctl status NetworkManager reframe-network avahi-daemon
+systemctl status NetworkManager reframe-wifi-import reframe-network avahi-daemon
 nmcli device status
 nmcli connection show
-journalctl -u reframe-network -u NetworkManager -b --no-pager
+journalctl -u reframe-wifi-import -u reframe-network -u NetworkManager -b --no-pager
 ```
 
 ## Contributing

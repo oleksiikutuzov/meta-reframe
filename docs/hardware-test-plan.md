@@ -97,6 +97,30 @@ Reboot and repeat the checks to verify profile persistence. Then remove or make
 the selected AP unavailable and confirm `reFrame-Setup` returns after the
 fallback interval.
 
+To validate boot-partition provisioning, flash a clean image and place this at
+the top level of its FAT boot partition before first boot:
+
+```json
+{"ssid":"test network","password":"test password","hidden":false}
+```
+
+After boot, confirm that the device joined the requested network, the profile
+persists, and the plaintext input was removed:
+
+```sh
+systemctl status reframe-wifi-import --no-pager
+journalctl -u reframe-wifi-import -b --no-pager
+nmcli connection show
+mkdir -p /run/boot-check
+mount -t vfat -o ro /dev/disk/by-label/boot /run/boot-check
+ls -la /run/boot-check/reframe-wifi*
+umount /run/boot-check
+```
+
+Repeat with malformed JSON and confirm the input is erased,
+`reframe-wifi.error.txt` contains no SSID or password, and the setup hotspot
+appears. Also test an open network and a hidden WPA network.
+
 ## Remaining networking validation
 
 - Flash and boot the image containing the dnsmasq service fix and Python module
@@ -106,6 +130,44 @@ fallback interval.
 - Confirm current-SSID display and switching to a second network.
 - Confirm recovery after a wrong password, AP loss, and repeated cold boots.
 - Record the exact Raspberry Pi board revision and final tested commit.
+
+## Dashboard validation
+
+The networking service remains the only process exposed on TCP port 80. While
+the setup AP is active it serves Wi-Fi provisioning and captive-portal probes;
+after a client connection is active it proxies requests to the dashboard on
+loopback. The dashboard and camera hardware API must not be exposed directly.
+
+After provisioning Wi-Fi, run:
+
+```sh
+systemctl is-active reframe reframe-dashboard reframe-network
+ss -lntp | grep -E ':80|:8000|:8077'
+curl -fsS http://127.0.0.1:8000/ >/dev/null
+curl -fsS http://reframe.local/ >/dev/null
+```
+
+Expected listeners are port 80 on all addresses and ports 8000 and 8077 on
+loopback only. In a browser at `http://reframe.local`, confirm that the gallery
+loads, a new capture appears, originals and processed images download, settings
+survive a dashboard restart and reboot, and switching back to setup mode still
+shows provisioning rather than the dashboard. Display-selection and QR-to-panel
+actions remain hardware-gated until the Spectra 6 milestone.
+
+The dashboard is intentionally unauthenticated and should be used only on a
+trusted LAN. There is no in-system updater: application self-update is disabled,
+and no OTA or package-feed upgrade path is installed. Updating currently means
+backing up `/var/lib/reframe`, building a replacement image, and reflashing the
+SD card.
+
+## Boot-speed validation
+
+The layer includes the application optimizations from upstream commit
+`50aef477375a8c40da5e0230748a1d2b89595f3b` and ports its applicable headless
+boot settings. Follow `docs/boot-analysis.md` after flashing. In particular,
+confirm the startup CPU governor returns from `performance` to `ondemand` or
+`schedutil`, UART remains usable in the debug image, and removing the global
+udev-settle wait does not introduce camera or PiSugar races.
 
 ## PiSugar 3 validation
 

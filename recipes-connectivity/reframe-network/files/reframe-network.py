@@ -6,6 +6,7 @@ import secrets
 import subprocess
 import threading
 import time
+from http.client import HTTPConnection
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs
 
@@ -15,6 +16,9 @@ AP_SSID = "reFrame-Setup"
 AP_ADDRESS = "10.42.0.1/24"
 LOCK = threading.RLock()
 CSRF_TOKEN = secrets.token_urlsafe(24)
+DASHBOARD_HOST = "127.0.0.1"
+DASHBOARD_PORT = 8000
+MAX_DASHBOARD_REQUEST_BYTES = 64 * 1024 * 1024
 
 
 def nmcli(*args, timeout=40, check=True):
@@ -164,6 +168,15 @@ let x=await r.json();message.textContent=x.message;if(r.ok)setTimeout(()=>locati
 status();scan();</script></html>""".replace("__CSRF_TOKEN__", CSRF_TOKEN)
 
 
+class ReframeHTTPServer(ThreadingHTTPServer):
+    # Captive-portal clients commonly issue several detection requests at
+    # once. Python's default backlog of five can overflow during that burst
+    # and make the kernel report a possible SYN flood.
+    request_queue_size = 64
+    daemon_threads = True
+    allow_reuse_address = True
+
+
 class Handler(BaseHTTPRequestHandler):
     def reply(self, status, body, content_type="application/json"):
         data = body.encode("utf-8")
@@ -181,7 +194,63 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Content-Length", "0")
         self.end_headers()
 
+    def proxy_dashboard(self, method=None, send_body=True):
+        length = int(self.headers.get("Content-Length", "0") or "0")
+        if length > MAX_DASHBOARD_REQUEST_BYTES:
+            self.reply(413, json.dumps({"message": "Request is too large"}))
+            return
+
+        body = self.rfile.read(length) if length else None
+        headers = {
+            key: value
+            for key, value in self.headers.items()
+            if key.lower()
+            not in {
+                "connection",
+                "host",
+                "keep-alive",
+                "proxy-connection",
+                "transfer-encoding",
+            }
+        }
+        headers["Host"] = f"{DASHBOARD_HOST}:{DASHBOARD_PORT}"
+        headers["X-Forwarded-Host"] = self.headers.get("Host", "")
+        headers["X-Forwarded-Proto"] = "http"
+
+        connection = HTTPConnection(DASHBOARD_HOST, DASHBOARD_PORT, timeout=30)
+        try:
+            connection.request(method or self.command, self.path, body=body, headers=headers)
+            response = connection.getresponse()
+            self.send_response(response.status, response.reason)
+            for key, value in response.getheaders():
+                if key.lower() not in {
+                    "connection",
+                    "keep-alive",
+                    "proxy-authenticate",
+                    "proxy-authorization",
+                    "te",
+                    "trailers",
+                    "transfer-encoding",
+                    "upgrade",
+                }:
+                    self.send_header(key, value)
+            self.send_header("Connection", "close")
+            self.end_headers()
+            if send_body:
+                while True:
+                    chunk = response.read(64 * 1024)
+                    if not chunk:
+                        break
+                    self.wfile.write(chunk)
+        except OSError:
+            self.reply(503, "Dashboard is starting or unavailable", "text/plain")
+        finally:
+            connection.close()
+
     def do_GET(self):
+        if active_wifi_is_client():
+            self.proxy_dashboard()
+            return
         if self.path == "/api/status":
             try:
                 self.reply(200, json.dumps(connection_status()))
@@ -201,6 +270,9 @@ class Handler(BaseHTTPRequestHandler):
             self.redirect_to_setup()
 
     def do_POST(self):
+        if active_wifi_is_client():
+            self.proxy_dashboard()
+            return
         if self.path != "/api/connect":
             self.reply(404, json.dumps({"message": "Not found"}))
             return
@@ -218,6 +290,30 @@ class Handler(BaseHTTPRequestHandler):
             self.reply(200, json.dumps({"message": "Connected. Open http://reframe.local"}))
         except (ValueError, RuntimeError, subprocess.TimeoutExpired) as error:
             self.reply(400, json.dumps({"message": str(error)}))
+
+    def do_DELETE(self):
+        if active_wifi_is_client():
+            self.proxy_dashboard()
+        else:
+            self.reply(404, json.dumps({"message": "Not found"}))
+
+    def do_PUT(self):
+        if active_wifi_is_client():
+            self.proxy_dashboard()
+        else:
+            self.reply(404, json.dumps({"message": "Not found"}))
+
+    def do_OPTIONS(self):
+        if active_wifi_is_client():
+            self.proxy_dashboard()
+        else:
+            self.reply(404, json.dumps({"message": "Not found"}))
+
+    def do_HEAD(self):
+        if active_wifi_is_client():
+            self.proxy_dashboard(method="GET", send_body=False)
+        else:
+            self.reply(404, "", "text/plain")
 
     def log_message(self, fmt, *args):
         # Do not put submitted form contents or client details in the journal.
@@ -271,4 +367,4 @@ if __name__ == "__main__":
     nmcli("general", "hostname", "reframe", check=False)
     ensure_setup_path()
     threading.Thread(target=monitor_connection, daemon=True).start()
-    ThreadingHTTPServer(("0.0.0.0", 80), Handler).serve_forever()
+    ReframeHTTPServer(("0.0.0.0", 80), Handler).serve_forever()

@@ -4,9 +4,18 @@ HOMEPAGE = "https://github.com/kaloyaan/reframe"
 LICENSE = "Apache-2.0"
 LIC_FILES_CHKSUM = "file://LICENSE;md5=329917d587673b2f419eb6dbaa94f14a"
 
+# MACHINE="reframe" is an active BitBake override. Keep the application
+# package name distinct so package-scoped variables cannot collapse into
+# machine overrides. Preserve the historical build/runtime provider alias.
+PN = "reframe-app"
+PROVIDES += "reframe"
+RPROVIDES:${PN} += "reframe"
+
 SRC_URI = " \
     git://github.com/kaloyaan/reframe.git;protocol=https;branch=main \
     file://0001-paths-Separate-immutable-code-from-writable-state.patch \
+    file://0002-dashboard-Separate-immutable-code-from-state.patch \
+    file://reframe-dashboard.service \
     file://reframe.service \
     file://reframe-settings.json \
     file://99-reframe-i2c.rules \
@@ -20,22 +29,28 @@ USERADD_PACKAGES = "${PN}"
 GROUPADD_PARAM:${PN} = "--system i2c"
 USERADD_PARAM:${PN} = "--system --no-create-home --home-dir ${localstatedir}/lib/reframe --shell /sbin/nologin --groups video,i2c --user-group reframe"
 
-SYSTEMD_SERVICE:${PN} = "reframe.service"
+SYSTEMD_SERVICE:${PN} = "reframe.service reframe-dashboard.service"
 SYSTEMD_AUTO_ENABLE:${PN} = "enable"
 
 RDEPENDS:${PN} = " \
     bash \
     python3-core \
+    python3-aiofiles \
+    python3-fastapi \
+    python3-httpx \
     python3-numpy \
     python3-picamera2 \
     python3-pillow \
+    python3-qrcode \
     python3-smbus2 \
+    python3-uvicorn \
     v4l-utils \
 "
 
 do_install() {
     install -d ${D}${libdir}/reframe/scripts
     install -m 0755 ${S}/reframe.py ${D}${libdir}/reframe/reframe.py
+    install -m 0755 ${S}/dashboard.py ${D}${libdir}/reframe/dashboard.py
     install -m 0755 ${S}/scripts/enable_hdr.sh ${D}${libdir}/reframe/scripts/enable_hdr.sh
 
     install -d ${D}${localstatedir}/lib/reframe/photos
@@ -46,6 +61,7 @@ do_install() {
 
     install -d ${D}${systemd_system_unitdir}
     install -m 0644 ${UNPACKDIR}/reframe.service ${D}${systemd_system_unitdir}/reframe.service
+    install -m 0644 ${UNPACKDIR}/reframe-dashboard.service ${D}${systemd_system_unitdir}/reframe-dashboard.service
 
     install -d ${D}${nonarch_base_libdir}/udev/rules.d
     install -m 0644 ${UNPACKDIR}/99-reframe-i2c.rules ${D}${nonarch_base_libdir}/udev/rules.d/99-reframe-i2c.rules

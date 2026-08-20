@@ -66,7 +66,19 @@ where supported.
 are reliable, time survives loss of network time, and repeated power cycles do
 not corrupt persistent reFrame data.
 
-### v0.6 — Spectra 6 display
+### v0.6 — Dashboard
+
+Add the required FastAPI, Uvicorn, HTTPX, Aiofiles, and QR recipes plus
+layer-owned dashboard services. Serve provisioning on the setup AP and proxy
+the dashboard through the same port after Wi-Fi connects. Keep upstream
+self-update disabled. There is no in-system updater in this milestone; updates
+require building and writing a replacement Yocto image.
+
+**Exit gate:** Browsing, original download, display selection, settings
+persistence, and QR/access views work over the network without disrupting the
+camera service.
+
+### v0.7 — Spectra 6 display
 
 Package the bundled Waveshare driver with reFrame and validate SPI/GPIO panel
 control independently before enabling application-driven refresh.
@@ -75,20 +87,16 @@ control independently before enabling application-driven refresh.
 image, repeated refreshes complete without service crashes, and a reboot restores
 normal capture-to-display operation.
 
-### v0.7 — Dashboard
-
-Add the required FastAPI, Uvicorn, HTTPX, Aiofiles, and QR recipes plus
-layer-owned dashboard services. Keep upstream self-update disabled.
-
-**Exit gate:** Browsing, original download, display selection, settings
-persistence, and QR/access views work over the network without disrupting the
-camera service.
-
 ### v1.0 — Production appliance
 
 Create `reframe-image` with only required runtime content. Separate development
 features, retain pinned revisions, and define image-controlled updates rather
 than application self-modification.
+
+Image-controlled updates are a future deliverable, not a description of the
+current implementation. Until a signed image-level updater with recovery is
+implemented, document backup and SD-card reflashing as the only supported
+upgrade procedure.
 
 **Exit gate:** A clean production build passes the full hardware test plan,
 meets recorded boot/RAM/storage baselines, contains no credentials or development
@@ -108,6 +116,13 @@ Record cold-boot reliability and hardware results in
 RAM, and boot-to-capture/display timings in `docs/boot-analysis.md` before making
 boot optimizations. A read-only root filesystem and image-level OTA mechanism
 are later milestones.
+
+The boot/capture latency work from upstream commit
+`50aef477375a8c40da5e0230748a1d2b89595f3b` is included by the pinned reFrame
+revision. The layer also applies its Yocto equivalents: headless firmware probe
+trims, a performance governor until the startup capture reports ready, and
+camera startup after udev trigger rather than global udev settle. Debug images
+deliberately retain the serial console for recovery.
 
 ## Implementation rules
 

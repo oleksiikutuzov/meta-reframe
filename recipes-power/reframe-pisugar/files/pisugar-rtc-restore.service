@@ -2,11 +2,11 @@
 Description=Restore trusted system time from the PiSugar RTC
 Wants=pisugar-server.service
 After=pisugar-server.service
-Before=reframe.service
 
 [Service]
 Type=oneshot
 ExecStart=/usr/libexec/reframe-pisugar-sync restore
+RemainAfterExit=yes
 TimeoutStartSec=30
 
 [Install]

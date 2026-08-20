@@ -1,7 +1,7 @@
 header:
   version: 22
 
-machine: raspberrypi0-2w-64
+machine: reframe
 distro: nodistro
 target: reframe-image-minimal
 
@@ -32,17 +32,3 @@ repos:
     commit: f62c67921474370829d24a4fa01ef88543f3906b
 
   meta-reframe:
-
-local_conf_header:
-  reframe-hardware: |
-    DEBUG_BUILD = "1"
-    INIT_MANAGER = "systemd"
-    ENABLE_I2C = "1"
-    ENABLE_SPI_BUS = "1"
-    ENABLE_UART = "${@oe.utils.vartrue('DEBUG_BUILD', '1', '0', d)}"
-    VIDEO_CAMERA = "1"
-    RASPBERRYPI_CAMERA_V3 = "1"
-    hostname:pn-base-files = "reframe"
-
-    # Required by the Pi Zero 2 W Wi-Fi firmware recipe.
-    LICENSE_FLAGS_ACCEPTED += "synaptics-killswitch"
