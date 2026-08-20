@@ -45,9 +45,9 @@ do_install() {
     install -d ${D}${sysconfdir}/NetworkManager/dnsmasq-shared.d
     install -m 0644 ${UNPACKDIR}/captive-portal.conf ${D}${sysconfdir}/NetworkManager/dnsmasq-shared.d/50-reframe-captive-portal.conf
 
-    # NetworkManager owns all interfaces in this appliance. The networkd wait
-    # helper otherwise waits two minutes for an interface networkd never owns
-    # and permanently leaves an otherwise healthy boot in degraded state.
+    # NetworkManager owns all interfaces in this appliance. Mask its redundant
+    # wait helper here; masks for units enabled by other packages are applied by
+    # the image after package postinst scripts have completed.
     install -d ${D}${sysconfdir}/systemd/system
     ln -s /dev/null ${D}${sysconfdir}/systemd/system/systemd-networkd-wait-online.service
 }
