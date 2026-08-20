@@ -2,6 +2,8 @@
 Description=reFrame Wi-Fi provisioning service
 After=NetworkManager.service
 Requires=NetworkManager.service
+Wants=reframe-wifi-import.service
+After=reframe-wifi-import.service
 
 [Service]
 Type=simple

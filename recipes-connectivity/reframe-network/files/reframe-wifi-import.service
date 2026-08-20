@@ -1,0 +1,16 @@
+[Unit]
+Description=Import reFrame Wi-Fi settings from the boot partition
+After=NetworkManager.service
+Requires=NetworkManager.service
+Before=reframe-network.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/libexec/reframe-wifi-import
+
+# Import requires temporary access to the boot block device and NetworkManager.
+User=root
+Group=root
+
+[Install]
+WantedBy=multi-user.target

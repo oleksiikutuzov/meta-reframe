@@ -232,6 +232,27 @@ deep-discharge the battery.
 
 ## Wi-Fi provisioning
 
+Wi-Fi can be prepared before the first boot. After writing the image, place a
+file named `reframe-wifi.json` in the top level of the computer-visible boot
+partition:
+
+```json
+{
+  "ssid": "My Wi-Fi",
+  "password": "correct horse battery staple",
+  "hidden": false
+}
+```
+
+`password` may be omitted or empty for an open network, and `hidden` defaults
+to `false`. SSIDs and passwords may contain spaces and punctuation because the
+file is parsed as JSON, not as shell code. On boot, reFrame creates a persistent
+NetworkManager profile and erases the plaintext JSON file. Remove the card
+safely after copying it and provision it in a trusted environment: until first
+boot consumes the file, anyone who can read the FAT boot partition can see the
+password. If parsing fails, the credentials are erased and a non-secret
+`reframe-wifi.error.txt` explanation is written beside them.
+
 On first boot, or whenever no saved Wi-Fi connection can be activated, join the
 open `reFrame-Setup` access point. Phones and laptops should open the Wi-Fi
 setup page as a captive portal; `http://10.42.0.1` remains the manual fallback.
@@ -249,10 +270,10 @@ required before treating that page as a production management interface.
 Inspect or recover networking over UART with:
 
 ```sh
-systemctl status NetworkManager reframe-network avahi-daemon
+systemctl status NetworkManager reframe-wifi-import reframe-network avahi-daemon
 nmcli device status
 nmcli connection show
-journalctl -u reframe-network -u NetworkManager -b --no-pager
+journalctl -u reframe-wifi-import -u reframe-network -u NetworkManager -b --no-pager
 ```
 
 ## Contributing

@@ -97,6 +97,30 @@ Reboot and repeat the checks to verify profile persistence. Then remove or make
 the selected AP unavailable and confirm `reFrame-Setup` returns after the
 fallback interval.
 
+To validate boot-partition provisioning, flash a clean image and place this at
+the top level of its FAT boot partition before first boot:
+
+```json
+{"ssid":"test network","password":"test password","hidden":false}
+```
+
+After boot, confirm that the device joined the requested network, the profile
+persists, and the plaintext input was removed:
+
+```sh
+systemctl status reframe-wifi-import --no-pager
+journalctl -u reframe-wifi-import -b --no-pager
+nmcli connection show
+mkdir -p /run/boot-check
+mount -t vfat -o ro /dev/disk/by-label/boot /run/boot-check
+ls -la /run/boot-check/reframe-wifi*
+umount /run/boot-check
+```
+
+Repeat with malformed JSON and confirm the input is erased,
+`reframe-wifi.error.txt` contains no SSID or password, and the setup hotspot
+appears. Also test an open network and a hidden WPA network.
+
 ## Remaining networking validation
 
 - Flash and boot the image containing the dnsmasq service fix and Python module
