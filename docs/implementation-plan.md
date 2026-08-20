@@ -71,7 +71,8 @@ not corrupt persistent reFrame data.
 Add the required FastAPI, Uvicorn, HTTPX, Aiofiles, and QR recipes plus
 layer-owned dashboard services. Serve provisioning on the setup AP and proxy
 the dashboard through the same port after Wi-Fi connects. Keep upstream
-self-update disabled.
+self-update disabled. There is no in-system updater in this milestone; updates
+require building and writing a replacement Yocto image.
 
 **Exit gate:** Browsing, original download, display selection, settings
 persistence, and QR/access views work over the network without disrupting the
@@ -91,6 +92,11 @@ normal capture-to-display operation.
 Create `reframe-image` with only required runtime content. Separate development
 features, retain pinned revisions, and define image-controlled updates rather
 than application self-modification.
+
+Image-controlled updates are a future deliverable, not a description of the
+current implementation. Until a signed image-level updater with recovery is
+implemented, document backup and SD-card reflashing as the only supported
+upgrade procedure.
 
 **Exit gate:** A clean production build passes the full hardware test plan,
 meets recorded boot/RAM/storage baselines, contains no credentials or development

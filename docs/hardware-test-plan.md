@@ -155,8 +155,10 @@ shows provisioning rather than the dashboard. Display-selection and QR-to-panel
 actions remain hardware-gated until the Spectra 6 milestone.
 
 The dashboard is intentionally unauthenticated and should be used only on a
-trusted LAN. Application self-update is unavailable in the immutable image;
-software updates remain image-controlled.
+trusted LAN. There is no in-system updater: application self-update is disabled,
+and no OTA or package-feed upgrade path is installed. Updating currently means
+backing up `/var/lib/reframe`, building a replacement image, and reflashing the
+SD card.
 
 ## PiSugar 3 validation
 

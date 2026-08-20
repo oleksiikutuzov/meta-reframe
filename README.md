@@ -5,11 +5,24 @@ purpose-built Linux image for the open-source reFrame camera hardware. The
 first target is a Raspberry Pi Zero 2 W (64-bit) with Camera Module 3 (IMX708),
 I2C, and SPI enabled.
 
-The current milestone integrates PiSugar 3 power and RTC support with the
-packaged reFrame camera image. A pinned, source-built PiSugar service exposes
-only local control sockets, preserves time across offline boots, and completes
-board shutdown after systemd powers off Linux. Display and dashboard integration
-remain disabled until their separate milestones.
+The current image integrates the camera application, Wi-Fi provisioning,
+loopback-backed dashboard, and PiSugar 3 power and RTC support. A pinned,
+source-built PiSugar service exposes only local control sockets, preserves time
+across offline boots, and completes board shutdown after systemd powers off
+Linux. Spectra display integration remains a separate milestone.
+
+## Software update policy
+
+There are currently **no in-system software updates**. The dashboard cannot
+install updates, and the image provides no OTA client, package-feed upgrade, or
+supported Git-based self-update path. Its update control is intentionally
+disabled and reports that updates are managed by the reFrame system image.
+
+To update a device today, build a new Yocto image and write it to the SD card.
+Back up anything needed from `/var/lib/reframe` first because reflashing the
+whole card can erase photos and settings. A future updater must be designed as
+an image-level, authenticated and signed mechanism with failure recovery; the
+upstream application's Git updater must not be enabled on this appliance.
 
 ## Build environment
 

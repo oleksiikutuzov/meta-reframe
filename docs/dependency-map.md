@@ -25,12 +25,10 @@ reFrame
 |
 +-- dashboard.py
 |   +-- FastAPI / Starlette
+|   +-- Uvicorn on loopback TCP 8000
 |   +-- HTTPX
 |   +-- Pillow
 |   +-- writable reFrame state
-|
-+-- dashboard_proxy.py
-|   +-- Python networking
 |
 +-- Camera Module 3
 |   +-- IMX708 kernel support
@@ -50,6 +48,10 @@ reFrame
 |   |   +-- Python standard-library HTTP server
 |   |   +-- nmcli
 |   |   +-- captive-portal DNS and HTTP redirects
+|   |   +-- dashboard reverse proxy while client Wi-Fi is active
+|   +-- reframe-wifi-import
+|   |   +-- one-shot boot-partition credential import
+|   |   +-- NetworkManager profile creation and plaintext-file erasure
 |   +-- Avahi (`reframe.local`)
 |
 +-- PiSugar 3
@@ -74,10 +76,16 @@ reFrame
   reFrame.
 - Keep application code immutable under `/usr/lib/reframe` and persistent state
   under `/var/lib/reframe`.
+- There is no in-system update mechanism yet. Do not enable the upstream Git
+  updater or modify files under `/usr/lib/reframe` on a running device. Current
+  upgrades require a newly built image and an explicit backup/reflash workflow;
+  a future OTA design must use authenticated, signed image artifacts and
+  include failure recovery.
 - Treat Waveshare, networking/dashboard, and PiSugar support as separate,
   testable integration stages.
-- Keep Wi-Fi credentials in NetworkManager profiles created on the target; do
-  not put them in recipes or application settings.
+- Keep Wi-Fi credentials in NetworkManager profiles created on the target. The
+  optional plaintext boot-partition JSON is input-only and must be erased after
+  import; never put credentials in recipes or application settings.
 - Keep the system-wide dnsmasq service disabled. NetworkManager owns a private
   dnsmasq process for each IPv4 shared connection, and a second daemon will
   collide on the hotspot DNS socket.
