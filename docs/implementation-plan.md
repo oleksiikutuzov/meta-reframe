@@ -117,6 +117,13 @@ RAM, and boot-to-capture/display timings in `docs/boot-analysis.md` before makin
 boot optimizations. A read-only root filesystem and image-level OTA mechanism
 are later milestones.
 
+The boot/capture latency work from upstream commit
+`50aef477375a8c40da5e0230748a1d2b89595f3b` is included by the pinned reFrame
+revision. The layer also applies its Yocto equivalents: headless firmware probe
+trims, a performance governor until the startup capture reports ready, and
+camera startup after udev trigger rather than global udev settle. Debug images
+deliberately retain the serial console for recovery.
+
 ## Implementation rules
 
 - Prefer existing OE recipes; never use target-side `pip`, virtual environments,
