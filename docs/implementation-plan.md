@@ -66,7 +66,18 @@ where supported.
 are reliable, time survives loss of network time, and repeated power cycles do
 not corrupt persistent reFrame data.
 
-### v0.6 — Spectra 6 display
+### v0.6 — Dashboard
+
+Add the required FastAPI, Uvicorn, HTTPX, Aiofiles, and QR recipes plus
+layer-owned dashboard services. Serve provisioning on the setup AP and proxy
+the dashboard through the same port after Wi-Fi connects. Keep upstream
+self-update disabled.
+
+**Exit gate:** Browsing, original download, display selection, settings
+persistence, and QR/access views work over the network without disrupting the
+camera service.
+
+### v0.7 — Spectra 6 display
 
 Package the bundled Waveshare driver with reFrame and validate SPI/GPIO panel
 control independently before enabling application-driven refresh.
@@ -74,15 +85,6 @@ control independently before enabling application-driven refresh.
 **Exit gate:** A standalone panel test succeeds, reFrame displays its processed
 image, repeated refreshes complete without service crashes, and a reboot restores
 normal capture-to-display operation.
-
-### v0.7 — Dashboard
-
-Add the required FastAPI, Uvicorn, HTTPX, Aiofiles, and QR recipes plus
-layer-owned dashboard services. Keep upstream self-update disabled.
-
-**Exit gate:** Browsing, original download, display selection, settings
-persistence, and QR/access views work over the network without disrupting the
-camera service.
 
 ### v1.0 — Production appliance
 

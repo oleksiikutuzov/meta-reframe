@@ -1,0 +1,25 @@
+[Unit]
+Description=reFrame dashboard service
+After=reframe.service
+Wants=reframe.service
+
+[Service]
+Type=simple
+User=reframe
+Group=reframe
+WorkingDirectory=/usr/lib/reframe
+Environment=REFRAME_APP_PATH=/usr/lib/reframe
+Environment=REFRAME_DATA_PATH=/var/lib/reframe
+ExecStart=/usr/bin/python3 -m uvicorn dashboard:app --host 127.0.0.1 --port 8000
+Restart=on-failure
+RestartSec=5
+
+# The dashboard shares persistent settings and photos with reframe.service.
+ReadWritePaths=/var/lib/reframe
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectHome=yes
+ProtectSystem=strict
+
+[Install]
+WantedBy=multi-user.target
