@@ -168,6 +168,15 @@ let x=await r.json();message.textContent=x.message;if(r.ok)setTimeout(()=>locati
 status();scan();</script></html>""".replace("__CSRF_TOKEN__", CSRF_TOKEN)
 
 
+class ReframeHTTPServer(ThreadingHTTPServer):
+    # Captive-portal clients commonly issue several detection requests at
+    # once. Python's default backlog of five can overflow during that burst
+    # and make the kernel report a possible SYN flood.
+    request_queue_size = 64
+    daemon_threads = True
+    allow_reuse_address = True
+
+
 class Handler(BaseHTTPRequestHandler):
     def reply(self, status, body, content_type="application/json"):
         data = body.encode("utf-8")
@@ -358,4 +367,4 @@ if __name__ == "__main__":
     nmcli("general", "hostname", "reframe", check=False)
     ensure_setup_path()
     threading.Thread(target=monitor_connection, daemon=True).start()
-    ThreadingHTTPServer(("0.0.0.0", 80), Handler).serve_forever()
+    ReframeHTTPServer(("0.0.0.0", 80), Handler).serve_forever()
