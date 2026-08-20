@@ -4,6 +4,13 @@ HOMEPAGE = "https://github.com/kaloyaan/reframe"
 LICENSE = "Apache-2.0"
 LIC_FILES_CHKSUM = "file://LICENSE;md5=329917d587673b2f419eb6dbaa94f14a"
 
+# MACHINE="reframe" is an active BitBake override. Keep the application
+# package name distinct so package-scoped variables cannot collapse into
+# machine overrides. Preserve the historical build/runtime provider alias.
+PN = "reframe-app"
+PROVIDES += "reframe"
+RPROVIDES:${PN} += "reframe"
+
 SRC_URI = " \
     git://github.com/kaloyaan/reframe.git;protocol=https;branch=main \
     file://0001-paths-Separate-immutable-code-from-writable-state.patch \
