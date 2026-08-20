@@ -63,8 +63,10 @@ KAS_WORK_DIR="$PWD" kas shell meta-reframe/kas/reframe.yml
 
 ## Raspberry Pi Zero 2 W configuration
 
-The kas configuration selects `raspberrypi0-2w-64`, systemd, I2C, SPI, and the
-Camera Module 3/IMX708 overlay. Its effective `local.conf` settings are:
+The kas configuration selects the layer-owned `reframe` machine. That machine
+directly requires meta-raspberrypi's `raspberrypi0-2w-64` definition and owns
+the complete appliance configuration, including development policy, hardware,
+hostname, firmware licence acceptance, and headless speed settings:
 
 ```sh
 DEBUG_BUILD = "1"
@@ -98,6 +100,11 @@ HDMI audio off after the Raspberry Pi machine recipe enables it. Release builds
 add `quiet loglevel=3`; debug builds intentionally retain the serial kernel
 console for recovery. See `docs/boot-analysis.md` for the service-side latency
 changes and measurements to collect on hardware.
+
+The application recipe uses package name `reframe-app`. It cannot use package
+name `reframe` because the machine name is an active BitBake override; the
+recipe retains `reframe` as a compatibility provider while systemd service and
+user-facing names remain unchanged.
 
 ## Serial bring-up console
 
@@ -133,10 +140,9 @@ KAS_WORK_DIR="$PWD" kas shell meta-reframe/kas/reframe.yml -c 'bitbake-layers sh
 KAS_WORK_DIR="$PWD" kas shell meta-reframe/kas/reframe.yml -c 'bitbake -p reframe-image-minimal'
 ```
 
-Artifacts are written below
-`build/tmp/deploy/images/raspberrypi0-2w-64/`. The tested configuration produces the
-stable symlink
-`reframe-image-minimal-raspberrypi0-2w-64.rootfs.wic`, a compressed `.wic.bz2`
+Artifacts are written below `build/tmp/deploy/images/reframe/`. The configured
+build produces the stable symlink
+`reframe-image-minimal-reframe.rootfs.wic`, a compressed `.wic.bz2`
 variant, and the matching `.wic.bmap` file.
 
 To flash with Balena Etcher, select the uncompressed `.wic` file as the image,
@@ -148,15 +154,19 @@ compressed image with:
 
 ```sh
 sudo bmaptool copy \
-    build/tmp/deploy/images/raspberrypi0-2w-64/reframe-image-minimal-raspberrypi0-2w-64.rootfs.wic.bz2 \
+    build/tmp/deploy/images/reframe/reframe-image-minimal-reframe.rootfs.wic.bz2 \
     /dev/sdX
 ```
 
-The 2026-08-19 build completed all 7,269 tasks successfully. This confirms the
-metadata, PiSugar package QA, root filesystem, SPDX/SBOM generation, and WIC
-image build. The libcamera capture path and PiSugar I2C addresses have been
-validated on physical hardware; repeat the service-level tests below after
-deploying this milestone.
+The 2026-08-20 pre-machine build completed all 10,405 tasks successfully. This
+confirms the metadata, PiSugar package QA, root filesystem, SPDX/SBOM
+generation, and WIC image build for the inherited board configuration. A
+subsequent `MACHINE = "reframe"` build passed parsing and image recipe QA, then
+was stopped by the operator during the uncached kernel-module build. Complete
+one full custom-machine build before treating the transition as image-validated.
+The libcamera capture path and PiSugar I2C addresses have been validated on
+physical hardware; repeat the service-level tests below after deploying this
+milestone.
 
 The `Yocto sanity` GitHub Actions workflow performs fast kas and BitBake metadata
 checks for pull requests and pushes to `main`. Run the separate `Yocto full layer
