@@ -7,12 +7,14 @@ SRC_URI = " \
     file://captive-portal.conf \
     file://reframe-network.py \
     file://reframe-network.service \
+    file://reframe-wifi-import.py \
+    file://reframe-wifi-import.service \
 "
 S = "${UNPACKDIR}"
 
 inherit allarch systemd
 
-SYSTEMD_SERVICE:${PN} = "reframe-network.service"
+SYSTEMD_SERVICE:${PN} = "reframe-wifi-import.service reframe-network.service"
 SYSTEMD_AUTO_ENABLE:${PN} = "enable"
 
 RDEPENDS:${PN} = " \
@@ -22,16 +24,23 @@ RDEPENDS:${PN} = " \
     networkmanager-nmcli \
     networkmanager-wifi \
     python3-core \
+    python3-crypt \
     python3-html \
+    python3-json \
+    python3-logging \
     python3-netclient \
+    util-linux-mount \
+    util-linux-umount \
 "
 
 do_install() {
     install -d ${D}${libexecdir}
     install -m 0755 ${UNPACKDIR}/reframe-network.py ${D}${libexecdir}/reframe-network
+    install -m 0755 ${UNPACKDIR}/reframe-wifi-import.py ${D}${libexecdir}/reframe-wifi-import
 
     install -d ${D}${systemd_system_unitdir}
     install -m 0644 ${UNPACKDIR}/reframe-network.service ${D}${systemd_system_unitdir}/reframe-network.service
+    install -m 0644 ${UNPACKDIR}/reframe-wifi-import.service ${D}${systemd_system_unitdir}/reframe-wifi-import.service
 
     install -d ${D}${sysconfdir}/NetworkManager/dnsmasq-shared.d
     install -m 0644 ${UNPACKDIR}/captive-portal.conf ${D}${sysconfdir}/NetworkManager/dnsmasq-shared.d/50-reframe-captive-portal.conf
