@@ -44,5 +44,12 @@ local_conf_header:
     RASPBERRYPI_CAMERA_V3 = "1"
     hostname:pn-base-files = "reframe"
 
+    # Trim firmware probes for hardware this headless appliance does not use.
+    # Debug images retain UART and its kernel console as a recovery path.
+    DISABLE_SPLASH = "1"
+    DISABLE_RPI_BOOT_LOGO = "1"
+    CMDLINE_DEBUG = "${@oe.utils.vartrue('DEBUG_BUILD', '', 'quiet loglevel=3', d)}"
+    RPI_EXTRA_CONFIG = "dtoverlay=disable-bt\nhdmi_blanking=2\nboot_delay=0\ndisplay_auto_detect=0\ndisable_poe_fan=1\nforce_eeprom_read=0\nenable_tvout=0"
+
     # Required by the Pi Zero 2 W Wi-Fi firmware recipe.
     LICENSE_FLAGS_ACCEPTED += "synaptics-killswitch"

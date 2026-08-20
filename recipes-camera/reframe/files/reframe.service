@@ -1,7 +1,6 @@
 [Unit]
 Description=reFrame camera capture service
-After=local-fs.target systemd-udev-settle.service
-Wants=systemd-udev-settle.service
+After=local-fs.target systemd-udev-trigger.service
 
 [Service]
 Type=notify
@@ -12,10 +11,13 @@ SupplementaryGroups=video i2c
 WorkingDirectory=/var/lib/reframe
 Environment=REFRAME_APP_PATH=/usr/lib/reframe
 Environment=REFRAME_DATA_PATH=/var/lib/reframe
+ExecStartPre=+/bin/sh -c 'if grep -qw performance /sys/devices/system/cpu/cpufreq/policy0/scaling_available_governors 2>/dev/null; then echo performance > /sys/devices/system/cpu/cpufreq/policy0/scaling_governor; fi; exit 0'
 ExecStart=/usr/bin/python3 /usr/lib/reframe/reframe.py
+ExecStartPost=+/bin/sh -c 'if grep -qw ondemand /sys/devices/system/cpu/cpufreq/policy0/scaling_available_governors 2>/dev/null; then echo ondemand > /sys/devices/system/cpu/cpufreq/policy0/scaling_governor; elif grep -qw schedutil /sys/devices/system/cpu/cpufreq/policy0/scaling_available_governors 2>/dev/null; then echo schedutil > /sys/devices/system/cpu/cpufreq/policy0/scaling_governor; fi; exit 0'
+ExecStopPost=+/bin/sh -c 'if grep -qw ondemand /sys/devices/system/cpu/cpufreq/policy0/scaling_available_governors 2>/dev/null; then echo ondemand > /sys/devices/system/cpu/cpufreq/policy0/scaling_governor; elif grep -qw schedutil /sys/devices/system/cpu/cpufreq/policy0/scaling_available_governors 2>/dev/null; then echo schedutil > /sys/devices/system/cpu/cpufreq/policy0/scaling_governor; fi; exit 0'
 Restart=on-failure
 RestartSec=5
-TimeoutStartSec=60
+TimeoutStartSec=45
 StandardOutput=journal
 StandardError=journal
 
