@@ -7,10 +7,10 @@ inherit core-image
 # in addition to the compressed Raspberry Pi machine artifacts.
 IMAGE_FSTYPES:append = " wic"
 
-# DEBUG_BUILD enables bring-up access and tools. Empty-password login remains
-# limited to serial; SSH empty-password and root login are not enabled.
+# DEBUG_BUILD enables unrestricted root access for hardware bring-up. Never use
+# these empty-password SSH settings in a production or untrusted-network image.
 IMAGE_FEATURES = "${@oe.utils.vartrue('DEBUG_BUILD', \
-    'ssh-server-openssh empty-root-password serial-autologin-root', '', d)}"
+    'ssh-server-openssh allow-empty-password empty-root-password allow-root-login serial-autologin-root', '', d)}"
 
 REFRAME_DEBUG_PACKAGES = "${@oe.utils.vartrue('DEBUG_BUILD', \
     'i2c-tools systemd-analyze v4l-utils', '', d)}"
