@@ -1,0 +1,129 @@
+From: Codex <codex@openai.com>
+Date: Fri, 28 Aug 2026 00:00:00 +0000
+Subject: [PATCH] display: use libgpiod for Raspberry Pi GPIO
+
+Yocto does not ship the Raspberry Pi OS gpiozero stack. Drive the panel's
+control pins through the kernel GPIO character device and retain spidev for
+pixel data.
+
+Upstream-Status: Inappropriate [Yocto integration]
+---
+ waveshare_epd/epdconfig.py | 55 +++++++++++++++++---------------------
+ 1 file changed, 24 insertions(+), 31 deletions(-)
+
+--- a/waveshare_epd/epdconfig.py
++++ b/waveshare_epd/epdconfig.py
+@@ -50,50 +50,23 @@ class RaspberryPi:
+ 
+     def __init__(self):
+         import spidev
+-        import gpiozero
+-        
+-        self.SPI = spidev.SpiDev()
+-        self.GPIO_RST_PIN    = gpiozero.LED(self.RST_PIN)
+-        self.GPIO_DC_PIN     = gpiozero.LED(self.DC_PIN)
+-        # self.GPIO_CS_PIN     = gpiozero.LED(self.CS_PIN)
+-        self.GPIO_PWR_PIN    = gpiozero.LED(self.PWR_PIN)
+-        self.GPIO_BUSY_PIN   = gpiozero.Button(self.BUSY_PIN, pull_up = False)
++        import gpiod
+ 
+-        
++        self.SPI = spidev.SpiDev()
++        self.gpiod = gpiod
++        self.outputs = None
++        self.busy = None
+ 
+     def digital_write(self, pin, value):
+-        if pin == self.RST_PIN:
+-            if value:
+-                self.GPIO_RST_PIN.on()
+-            else:
+-                self.GPIO_RST_PIN.off()
+-        elif pin == self.DC_PIN:
+-            if value:
+-                self.GPIO_DC_PIN.on()
+-            else:
+-                self.GPIO_DC_PIN.off()
+-        # elif pin == self.CS_PIN:
+-        #     if value:
+-        #         self.GPIO_CS_PIN.on()
+-        #     else:
+-        #         self.GPIO_CS_PIN.off()
+-        elif pin == self.PWR_PIN:
+-            if value:
+-                self.GPIO_PWR_PIN.on()
+-            else:
+-                self.GPIO_PWR_PIN.off()
++        if pin in (self.RST_PIN, self.DC_PIN, self.PWR_PIN):
++            state = self.gpiod.line.Value.ACTIVE if value else self.gpiod.line.Value.INACTIVE
++            self.outputs.set_value(pin, state)
++        # Chip select is owned by the spidev controller.
+ 
+     def digital_read(self, pin):
+         if pin == self.BUSY_PIN:
+-            return self.GPIO_BUSY_PIN.value
+-        elif pin == self.RST_PIN:
+-            return self.RST_PIN.value
+-        elif pin == self.DC_PIN:
+-            return self.DC_PIN.value
+-        # elif pin == self.CS_PIN:
+-        #     return self.CS_PIN.value
+-        elif pin == self.PWR_PIN:
+-            return self.PWR_PIN.value
++            return int(self.busy.get_value(pin) == self.gpiod.line.Value.ACTIVE)
++        return 0
+ 
+     def delay_ms(self, delaytime):
+         time.sleep(delaytime / 1000.0)
+@@ -114,7 +87,21 @@ class RaspberryPi:
+         return self.DEV_SPI.DEV_SPI_ReadData()
+ 
+     def module_init(self, cleanup=False):
+-        self.GPIO_PWR_PIN.on()
++        if self.outputs is None:
++            output_settings = self.gpiod.LineSettings(
++                direction=self.gpiod.line.Direction.OUTPUT,
++                output_value=self.gpiod.line.Value.INACTIVE,
++            )
++            self.outputs = self.gpiod.request_lines(
++                "/dev/gpiochip0", consumer="reframe-display",
++                config={(self.RST_PIN, self.DC_PIN, self.PWR_PIN): output_settings},
++            )
++            self.busy = self.gpiod.request_lines(
++                "/dev/gpiochip0", consumer="reframe-display",
++                config={self.BUSY_PIN: self.gpiod.LineSettings(
++                    direction=self.gpiod.line.Direction.INPUT)},
++            )
++        self.digital_write(self.PWR_PIN, 1)
+         
+         if cleanup:
+             find_dirs = [
+@@ -149,19 +136,14 @@ class RaspberryPi:
+         logger.debug("spi end")
+         self.SPI.close()
+ 
+-        self.GPIO_RST_PIN.off()
+-        self.GPIO_DC_PIN.off()
+-        self.GPIO_PWR_PIN.off()
++        self.digital_write(self.RST_PIN, 0)
++        self.digital_write(self.DC_PIN, 0)
++        self.digital_write(self.PWR_PIN, 0)
+         logger.debug("close 5V, Module enters 0 power consumption ...")
+-        
+-        if cleanup:
+-            self.GPIO_RST_PIN.close()
+-            self.GPIO_DC_PIN.close()
+-            # self.GPIO_CS_PIN.close()
+-            self.GPIO_PWR_PIN.close()
+-            self.GPIO_BUSY_PIN.close()
+-
+-        
++        self.outputs.release()
++        self.busy.release()
++        self.outputs = None
++        self.busy = None
+ 
+ 
+ 
+-- 
+2.50.1

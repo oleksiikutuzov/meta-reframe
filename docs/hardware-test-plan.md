@@ -152,7 +152,25 @@ loopback only. In a browser at `http://reframe.local`, confirm that the gallery
 loads, a new capture appears, originals and processed images download, settings
 survive a dashboard restart and reboot, and switching back to setup mode still
 shows provisioning rather than the dashboard. Display-selection and QR-to-panel
-actions remain hardware-gated until the Spectra 6 milestone.
+actions require the connected Spectra 6 panel and should complete a panel
+refresh without disrupting camera capture.
+
+## Spectra 6 display validation
+
+With the Waveshare 4-inch Spectra 6 panel connected to SPI0 and GPIO17, GPIO25,
+GPIO24, and GPIO18, stop the application before running the independent test:
+
+```sh
+systemctl stop reframe.service
+runuser -u reframe -- reframe-display-test
+systemctl start reframe.service
+```
+
+- Confirm all six test colors are visible and correctly oriented.
+- Confirm the test exits successfully and releases `/dev/gpiochip0` and SPI0.
+- Capture several photos and confirm each selected processed image refreshes.
+- Reboot and confirm automatic display initialization and capture-to-display.
+- Record panel revision, refresh time, failures, and relevant service journal.
 
 The dashboard is intentionally unauthenticated and should be used only on a
 trusted LAN. There is no in-system updater: application self-update is disabled,

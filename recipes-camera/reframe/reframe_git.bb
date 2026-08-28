@@ -1,8 +1,11 @@
 SUMMARY = "reFrame camera appliance application"
 DESCRIPTION = "Pinned reFrame camera capture and image-processing service"
 HOMEPAGE = "https://github.com/kaloyaan/reframe"
-LICENSE = "Apache-2.0"
-LIC_FILES_CHKSUM = "file://LICENSE;md5=329917d587673b2f419eb6dbaa94f14a"
+LICENSE = "Apache-2.0 & MIT"
+LIC_FILES_CHKSUM = " \
+    file://LICENSE;md5=329917d587673b2f419eb6dbaa94f14a \
+    file://waveshare_epd/epdconfig.py;beginline=9;endline=27;md5=3d616586aeb4c3c6f90fbdb1a6c2457e \
+"
 
 # MACHINE="reframe" is an active BitBake override. Keep the application
 # package name distinct so package-scoped variables cannot collapse into
@@ -15,10 +18,12 @@ SRC_URI = " \
     git://github.com/kaloyaan/reframe.git;protocol=https;branch=main \
     file://0001-paths-Separate-immutable-code-from-writable-state.patch \
     file://0002-dashboard-Separate-immutable-code-from-state.patch \
+    file://0003-display-Use-libgpiod-for-Raspberry-Pi-GPIO.patch \
+    file://reframe-display-test \
     file://reframe-dashboard.service \
     file://reframe.service \
     file://reframe-settings.json \
-    file://99-reframe-i2c.rules \
+    file://99-reframe-hardware.rules \
 "
 SRCREV = "5b88b443a9225b7954b57bbb784854c081c6991b"
 PV = "0.3+git${SRCPV}"
@@ -38,11 +43,13 @@ RDEPENDS:${PN} = " \
     python3-aiofiles \
     python3-fastapi \
     python3-httpx \
+    python3-gpiod \
     python3-numpy \
     python3-picamera2 \
     python3-pillow \
     python3-qrcode \
     python3-smbus2 \
+    python3-spidev \
     python3-uvicorn \
     v4l-utils \
 "
@@ -52,6 +59,11 @@ do_install() {
     install -m 0755 ${S}/reframe.py ${D}${libdir}/reframe/reframe.py
     install -m 0755 ${S}/dashboard.py ${D}${libdir}/reframe/dashboard.py
     install -m 0755 ${S}/scripts/enable_hdr.sh ${D}${libdir}/reframe/scripts/enable_hdr.sh
+    cp -R --no-preserve=ownership ${S}/waveshare_epd ${D}${libdir}/reframe/
+    rm -f ${D}${libdir}/reframe/waveshare_epd/*.so
+
+    install -d ${D}${bindir}
+    install -m 0755 ${UNPACKDIR}/reframe-display-test ${D}${bindir}/reframe-display-test
 
     install -d ${D}${localstatedir}/lib/reframe/photos
     install -d ${D}${localstatedir}/lib/reframe/dithered_photos
@@ -64,13 +76,13 @@ do_install() {
     install -m 0644 ${UNPACKDIR}/reframe-dashboard.service ${D}${systemd_system_unitdir}/reframe-dashboard.service
 
     install -d ${D}${nonarch_base_libdir}/udev/rules.d
-    install -m 0644 ${UNPACKDIR}/99-reframe-i2c.rules ${D}${nonarch_base_libdir}/udev/rules.d/99-reframe-i2c.rules
+    install -m 0644 ${UNPACKDIR}/99-reframe-hardware.rules ${D}${nonarch_base_libdir}/udev/rules.d/99-reframe-hardware.rules
 }
 
 FILES:${PN} += " \
     ${libdir}/reframe \
     ${localstatedir}/lib/reframe \
-    ${nonarch_base_libdir}/udev/rules.d/99-reframe-i2c.rules \
+    ${nonarch_base_libdir}/udev/rules.d/99-reframe-hardware.rules \
 "
 
 CONFFILES:${PN} = "${localstatedir}/lib/reframe/settings.json"
