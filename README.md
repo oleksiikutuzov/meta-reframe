@@ -5,11 +5,11 @@ purpose-built Linux image for the open-source reFrame camera hardware. The
 first target is a Raspberry Pi Zero 2 W (64-bit) with Camera Module 3 (IMX708),
 I2C, and SPI enabled.
 
-The current image integrates the camera application, Wi-Fi provisioning,
-loopback-backed dashboard, and PiSugar 3 power and RTC support. A pinned,
-source-built PiSugar service exposes only local control sockets, preserves time
-across offline boots, and completes board shutdown after systemd powers off
-Linux. Spectra display integration remains a separate milestone.
+The current image integrates the camera application, Waveshare 4-inch Spectra
+6 e-paper display, Wi-Fi provisioning, loopback-backed dashboard, and PiSugar 3
+power and RTC support. A pinned, source-built PiSugar service exposes only
+local control sockets, preserves time across offline boots, and completes board
+shutdown after systemd powers off Linux.
 
 ## Software update policy
 
@@ -88,12 +88,12 @@ LICENSE_FLAGS_ACCEPTED += "synaptics-killswitch"
 `meta-raspberrypi`. Review the restricted Wi-Fi firmware license before using
 the accepted `synaptics-killswitch` flag.
 
-`DEBUG_BUILD = "1"` enables SSH, the UART console with root autologin, an empty
-root password for that console, and the `i2c-tools`, `v4l-utils`, and
-`systemd-analyze` packages. Without that setting these development additions
-are omitted and UART is disabled. This standard OpenEmbedded variable also
-selects debug compiler optimization, so unset it or set it to `0` for release
-builds.
+`DEBUG_BUILD = "1"` enables SSH with empty-password root login, the UART console
+with root autologin, and the `i2c-tools`, `v4l-utils`, and `systemd-analyze`
+packages. This is intentionally insecure and must only be used on a trusted
+bring-up network. Without that setting these development additions are omitted
+and UART is disabled. This standard OpenEmbedded variable also selects debug
+compiler optimization, so unset it or set it to `0` for release builds.
 
 The headless settings skip unused firmware probes. A layer append also forces
 HDMI audio off after the Raspberry Pi machine recipe enables it. Release builds
@@ -120,9 +120,9 @@ Open the console from the build host, replacing the device path as needed:
 picocom --baud 115200 /dev/ttyUSB0
 ```
 
-The empty root password is limited to this local development console; SSH does
-not allow empty-password root login. Remove serial autologin from the eventual
-production image.
+The debug image also accepts root SSH login with an empty password. Keep it on a
+trusted isolated network, and disable both SSH empty-password login and serial
+autologin in the eventual production image.
 
 ## Build and deploy
 
@@ -226,6 +226,24 @@ startup capture, writes the original JPEG and processed PNG as `reframe`, then
 waits for the PiSugar button on I2C. Reboot the board and confirm that settings
 and existing numbered captures persist and that a new capture uses the next
 number.
+
+The Waveshare driver is installed from the pinned reFrame source and uses
+`/dev/spidev0.0` for panel data plus `/dev/gpiochip0` for GPIO17 (reset),
+GPIO25 (data/command), GPIO24 (busy), and GPIO18 (panel power). Automatic
+display is enabled in the image's default settings. Stop the camera service
+before the independent test so it releases those GPIO lines:
+
+```sh
+systemctl stop reframe.service
+runuser -u reframe -- reframe-display-test
+systemctl start reframe.service
+journalctl -u reframe.service -b --no-pager
+```
+
+The test should render black, white, yellow, red, blue, and green bars and then
+put the panel to sleep. After restarting the service, take a photo and confirm
+its processed image refreshes the panel. Repeat several captures and reboot
+once to verify clean GPIO/SPI release and automatic display recovery.
 
 The packaged application polls the PiSugar power-button state directly over
 I2C, matching the original reFrame hardware design. Without PiSugar hardware,
