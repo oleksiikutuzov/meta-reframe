@@ -1,0 +1,36 @@
+#!/usr/bin/env python3
+"""Exercise the Waveshare 4-inch Spectra 6 panel without the camera service."""
+
+import sys
+
+from PIL import Image, ImageDraw
+
+sys.path.insert(0, "/usr/lib/reframe")
+from waveshare_epd import epd4in0e
+
+
+COLORS = ("black", "white", "yellow", "red", "blue", "green")
+
+
+def main():
+    image = Image.new("RGB", (epd4in0e.EPD_HEIGHT, epd4in0e.EPD_WIDTH))
+    draw = ImageDraw.Draw(image)
+    stripe_width = image.width // len(COLORS)
+    for index, color in enumerate(COLORS):
+        left = index * stripe_width
+        right = image.width if index == len(COLORS) - 1 else left + stripe_width
+        draw.rectangle((left, 0, right, image.height), fill=color)
+    draw.rectangle((10, 10, 310, 55), fill="white")
+    draw.text((20, 20), "reFrame Spectra 6 display test", fill="black")
+
+    panel = epd4in0e.EPD()
+    try:
+        if panel.init() != 0:
+            raise RuntimeError("panel initialization failed")
+        panel.display(panel.getbuffer(image))
+    finally:
+        panel.sleep()
+
+
+if __name__ == "__main__":
+    main()
