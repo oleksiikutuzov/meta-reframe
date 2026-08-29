@@ -19,6 +19,7 @@ SRC_URI = " \
     file://0001-paths-Separate-immutable-code-from-writable-state.patch \
     file://0002-dashboard-Separate-immutable-code-from-state.patch \
     file://0003-display-Use-libgpiod-for-Raspberry-Pi-GPIO.patch \
+    file://0005-capture-Save-images-atomically.patch \
     file://reframe-display-test \
     file://reframe-dashboard.service \
     file://reframe.service \

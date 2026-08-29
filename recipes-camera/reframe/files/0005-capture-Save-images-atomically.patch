@@ -1,0 +1,168 @@
+From 881fc3eb9238bcaa3f5c6a3b602b749307e1ffa6 Mon Sep 17 00:00:00 2001
+From: Codex <codex@openai.com>
+Date: Sat, 29 Aug 2026 22:04:00 +0000
+Subject: [PATCH] capture: save images atomically
+
+Write capture outputs through synced temporary files and atomically rename them
+only after encoding succeeds. Track save threads so graceful service and
+timeout shutdowns wait for pending writes.
+
+Upstream-Status: Pending
+---
+ reframe.py | 94 +++++++++++++++++++++++++++++++++++++++++++++++-------
+ 1 file changed, 82 insertions(+), 12 deletions(-)
+
+diff --git a/reframe.py b/reframe.py
+index a81952c..57e1e11 100644
+--- a/reframe.py
++++ b/reframe.py
+@@ -5,6 +5,7 @@ import sys
+ import json
+ import subprocess
+ import logging
++import signal
+ import socket
+ from time import sleep
+ 
+@@ -91,6 +92,34 @@ DISPLAY_IMAGE_SIZE = (DISPLAY_IMAGE_WIDTH, DISPLAY_IMAGE_HEIGHT)
+ DISPLAY_PANEL_SIZE = (DISPLAY_PANEL_WIDTH, DISPLAY_PANEL_HEIGHT)
+ BUTTON_POLL_INTERVAL_SECONDS = 0.025
+ 
++
++def _save_image_atomically(image, final_path, image_format):
++    """Encode and sync an image before making its final path visible."""
++    folder = os.path.dirname(final_path)
++    basename = os.path.basename(final_path)
++    temporary_path = os.path.join(
++        folder,
++        f".{basename}.{os.getpid()}.{threading.get_ident()}.tmp"
++    )
++    try:
++        with open(temporary_path, "wb") as output:
++            image.save(output, format=image_format)
++            output.flush()
++            os.fsync(output.fileno())
++        os.replace(temporary_path, final_path)
++
++        directory_flags = os.O_RDONLY | getattr(os, "O_DIRECTORY", 0)
++        directory_fd = os.open(folder, directory_flags)
++        try:
++            os.fsync(directory_fd)
++        finally:
++            os.close(directory_fd)
++    finally:
++        try:
++            os.unlink(temporary_path)
++        except FileNotFoundError:
++            pass
++
+ # Color palettes for dithering. We blend between the two to create a saturated look while preserving details.
+ # Idea from https://github.com/pimoroni/inky
+ DESATURATED_PALETTE = [
+@@ -1267,11 +1296,54 @@ class CameraSystem:
+         self.timeout_running = False
+         self._timeout_started = False
+         self._timeout_stop_event = threading.Event()
++        self._save_threads = set()
++        self._save_threads_lock = threading.Lock()
+         self.dashboard_qr_thread = None
+         self._dashboard_qr_monitor_started = False
+         self.dashboard_qr_running = False
+         logging.info("Timeout monitor initialization deferred for fast startup")
+ 
++    def _start_output_save(self, original_image, photo_path,
++                           dithered_image, dithered_path, result):
++        """Save capture outputs in a tracked background thread."""
++        def _save_outputs():
++            try:
++                _save_image_atomically(original_image, photo_path, "JPEG")
++                result["file_size"] = os.path.getsize(photo_path)
++                logging.info(f"Original JPEG saved: {photo_path}")
++                _save_image_atomically(dithered_image, dithered_path, "PNG")
++                logging.info(f"Dithered PNG saved: {dithered_path}")
++            except Exception as e:
++                logging.error(f"Error saving photo outputs: {e}")
++            finally:
++                with self._save_threads_lock:
++                    self._save_threads.discard(threading.current_thread())
++
++        save_thread = threading.Thread(target=_save_outputs, daemon=True)
++        with self._save_threads_lock:
++            self._save_threads.add(save_thread)
++        try:
++            save_thread.start()
++        except Exception:
++            with self._save_threads_lock:
++                self._save_threads.discard(save_thread)
++            raise
++
++    def wait_for_pending_saves(self, timeout=10):
++        """Wait for output files to finish without blocking indefinitely."""
++        deadline = time.monotonic() + timeout
++        while True:
++            with self._save_threads_lock:
++                pending = list(self._save_threads)
++            if not pending:
++                return True
++            remaining = deadline - time.monotonic()
++            if remaining <= 0:
++                logging.error("Timed out waiting for %d photo save(s)", len(pending))
++                return False
++            for save_thread in pending:
++                save_thread.join(timeout=remaining)
++
+     def start_timeout_monitor(self):
+         """Start the background timeout monitoring thread."""
+         if not self._timeout_started and self.camera_manager.is_timeout_enabled():
+@@ -1308,6 +1380,7 @@ class CameraSystem:
+             try:
+                 if self.camera_manager.is_timeout_exceeded():
+                     logging.info("Timeout exceeded, initiating system shutdown")
++                    self.wait_for_pending_saves()
+                     self.camera_manager.shutdown_system()
+                     # If we reach here, shutdown failed, so stop monitoring
+                     break
+@@ -1452,18 +1525,9 @@ class CameraSystem:
+ 
+                 # Save files in background after the display refresh has been dispatched.
+                 result["processed_path"] = dithered_path
+-                def _save_outputs():
+-                    try:
+-                        original_image.save(photo_path, format="JPEG")
+-                        result["file_size"] = os.path.getsize(photo_path)
+-                        logging.info(f"Original JPEG saved: {photo_path}")
+-                        dithered_image.save(dithered_path, format="PNG")
+-                        logging.info(f"Dithered PNG saved: {dithered_path}")
+-                    except Exception as e:
+-                        logging.error(f"Error saving photo outputs: {e}")
+-
+-                save_thread = threading.Thread(target=_save_outputs, daemon=True)
+-                save_thread.start()
++                self._start_output_save(
++                    original_image, photo_path, dithered_image, dithered_path, result
++                )
+ 
+             return result
+ 
+@@ -1752,6 +1816,11 @@ def _start_api_server_in_background(host: str = "127.0.0.1", port: int = 8077):
+ def main():
+     global camera_system
+ 
++    def _handle_termination(signum, frame):
++        logging.info("Termination requested; finishing pending photo saves")
++        raise KeyboardInterrupt
++    signal.signal(signal.SIGTERM, _handle_termination)
++
+     startup_display = EInkDisplay()
+     startup_settings_path = SETTINGS_PATH
+     if _auto_display_enabled(startup_settings_path):
+@@ -1866,6 +1935,7 @@ def main():
+             # Stop timeout monitor and put display to sleep if initialized inside CameraSystem
+             if camera_system:
+                 camera_system.stop_timeout_monitor()
++                camera_system.wait_for_pending_saves()
+                 camera_system.stop_dashboard_qr_monitor()
+                 if camera_system.eink_display:
+                     camera_system.eink_display.sleep()
+-- 
+2.34.1
