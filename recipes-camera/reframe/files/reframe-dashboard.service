@@ -12,6 +12,10 @@ Environment=REFRAME_APP_PATH=/usr/lib/reframe
 Environment=REFRAME_DATA_PATH=/var/lib/reframe
 Environment=REFRAME_RAUC_COMPATIBLE=reframe
 ExecStartPre=+/usr/bin/install -d -o reframe -g reframe -m 0700 /var/lib/reframe/.updates
+# The persistent ext4 filesystem is mounted over the image directory. Its
+# mountpoint itself is created by mkfs as root-owned, which prevents the
+# dashboard's atomic settings writer from creating a temporary file there.
+ExecStartPre=+/usr/bin/chown reframe:reframe /var/lib/reframe
 ExecStart=/usr/bin/python3 -m uvicorn dashboard:app --host 127.0.0.1 --port 8000
 Restart=on-failure
 RestartSec=5
