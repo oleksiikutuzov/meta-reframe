@@ -57,19 +57,19 @@ jobs:
         run: |
           ~/.local/bin/kas shell kas/reframe.yml -c '
             set -eu
-            bitbake -p reframe-image-minimal
+            bitbake -p reframe-image
 
             bitbake-layers show-layers | tee layers.txt
             for collection in core openembedded-layer meta-python raspberrypi reframe; do
               grep -Eq "^${collection}[[:space:]]" layers.txt
             done
 
-            bitbake-layers show-recipes reframe-image-minimal | tee recipes.txt
-            grep -Eq "^reframe-image-minimal:" recipes.txt
+            bitbake-layers show-recipes reframe-image | tee recipes.txt
+            grep -Eq "^reframe-image:" recipes.txt
             bitbake-layers show-recipes reframe-app | tee app-recipes.txt
             grep -Eq "^reframe-app:" app-recipes.txt
 
-            bitbake -e reframe-image-minimal > bitbake.env
+            bitbake -e reframe-image > bitbake.env
             for expected in \
               "MACHINE=\"reframe\"" \
               "INIT_MANAGER=\"systemd\"" \

@@ -3,7 +3,7 @@ header:
 
 machine: reframe
 distro: nodistro
-target: reframe-image-minimal
+target: reframe-image
 
 repos:
   bitbake:
