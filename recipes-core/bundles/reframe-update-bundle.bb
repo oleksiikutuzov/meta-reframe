@@ -4,10 +4,11 @@ LICENSE = "MIT"
 inherit bundle
 
 RAUC_BUNDLE_COMPATIBLE = "${MACHINE}"
+RAUC_BUNDLE_VERSION = "1.0.0"
 RAUC_BUNDLE_FORMAT = "verity"
 RAUC_BUNDLE_SLOTS = "rootfs"
 
-RAUC_SLOT_rootfs = "reframe-image-minimal"
+RAUC_SLOT_rootfs = "reframe-image"
 RAUC_SLOT_rootfs[fstype] = "ext4"
 
 # These repository-owned credentials are deliberately development-only. A

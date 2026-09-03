@@ -14,7 +14,7 @@ is checked out beside `meta-reframe` and the build directory is shared.
 
 The main target is the layer-owned `reframe` machine, based on
 meta-raspberrypi's 64-bit Raspberry Pi Zero 2 W definition. The image recipe is
-`reframe-image-minimal`. Application, service, patch, and configuration files
+`reframe-image`. Application, service, patch, and configuration files
 belong beside their owning recipes under `recipes-*`.
 
 The application recipe is named `reframe-app`; `reframe` cannot be its package

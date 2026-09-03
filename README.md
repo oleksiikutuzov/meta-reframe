@@ -18,7 +18,7 @@ KAS_WORK_DIR="$PWD" kas build meta-reframe/kas/reframe.yml
 ```
 
 The image is written to
-`build/tmp/deploy/images/reframe/reframe-image-minimal-reframe.rootfs.wic.bz2`.
+`build/tmp/deploy/images/reframe/reframe-image-reframe.rootfs.wic.bz2`.
 
 Build an update bundle with:
 
@@ -37,7 +37,7 @@ Flash the `.wic.bz2` image with Balena Etcher, or use `bmaptool`. Replace
 
 ```sh
 sudo bmaptool copy \
-    build/tmp/deploy/images/reframe/reframe-image-minimal-reframe.rootfs.wic.bz2 \
+    build/tmp/deploy/images/reframe/reframe-image-reframe.rootfs.wic.bz2 \
     /dev/sdX
 ```
 
