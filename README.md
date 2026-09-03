@@ -13,16 +13,26 @@ shutdown after systemd powers off Linux.
 
 ## Software update policy
 
-There are currently **no in-system software updates**. The dashboard cannot
-install updates, and the image provides no OTA client, package-feed upgrade, or
-supported Git-based self-update path. Its update control is intentionally
-disabled and reports that updates are managed by the reFrame system image.
+System-image updates use RAUC with signed verity bundles, redundant ext4 root
+filesystems, U-Boot attempt counters, and automatic rollback. The dashboard can
+upload, verify, and install a local `.raucb` into the inactive slot; the
+upstream application's Git updater remains disabled. Because the dashboard is
+intended for a trusted LAN and has no user authentication, do not expose it to
+an untrusted network. RAUC still rejects bundles that are not signed by the
+device trust anchor or do not match the machine compatibility string.
 
-To update a device today, build a new Yocto image and write it to the SD card.
-Back up anything needed from `/var/lib/reframe` first because reflashing the
-whole card can erase photos and settings. A future updater must be designed as
-an image-level, authenticated and signed mechanism with failure recovery; the
-upstream application's Git updater must not be enabled on this appliance.
+The WIC image has a shared firmware partition, `rootfs_A`, `rootfs_B`, and a
+`reframe-data` partition mounted at `/var/lib/reframe`. On first boot the last
+partition and its filesystem grow to fill the SD card. Photos and settings
+therefore survive root-slot replacement. This layout is incompatible with the
+older single-rootfs image and requires one full-card reflash when adopting
+RAUC. Back up existing `/var/lib/reframe` data before that migration.
+
+The repository contains a public development certificate and its private key
+so developers can build a complete test bundle. They are not production
+credentials. Production builds must keep the signing key outside source
+control, provision the matching trust anchor, and override `RAUC_KEY_FILE` and
+`RAUC_CERT_FILE`.
 
 ## Build environment
 
@@ -139,6 +149,41 @@ KAS_WORK_DIR="$PWD" kas shell meta-reframe/kas/reframe.yml -c 'bitbake-layers sh
 KAS_WORK_DIR="$PWD" kas shell meta-reframe/kas/reframe.yml -c 'bitbake-layers show-recipes reframe-image-minimal'
 KAS_WORK_DIR="$PWD" kas shell meta-reframe/kas/reframe.yml -c 'bitbake -p reframe-image-minimal'
 ```
+
+Build the signed development update bundle with:
+
+```sh
+KAS_WORK_DIR="$PWD" kas shell meta-reframe/kas/reframe.yml -c 'bitbake reframe-update-bundle'
+```
+
+The bundle is deployed as
+`build/tmp/deploy/images/reframe/reframe-update-bundle-reframe.raucb`. Inspect
+it on the build host with `rauc-native`, then install it on a test device:
+
+```sh
+KAS_WORK_DIR="$PWD" kas shell meta-reframe/kas/reframe.yml -c \
+    'bitbake rauc-native -c addto_recipe_sysroot && \
+     oe-run-native rauc-native rauc info \
+       --keyring=../meta-reframe/recipes-core/rauc/files/ca.cert.pem \
+       tmp/deploy/images/reframe/reframe-update-bundle-reframe.raucb'
+
+rauc status
+rauc install /path/to/reframe-update-bundle-reframe.raucb
+```
+
+After reboot, use `rauc status` to confirm the new slot is active and marked
+good. During rollback testing, interrupt a trial boot three times and verify
+that U-Boot falls back to the previous slot. Do not deploy production updates
+until both successful activation and forced rollback have been tested on the
+target hardware.
+
+For the normal dashboard procedure, open **settings → software updates**, pick
+the generated `.raucb`, and select **upload and verify bundle**. The install
+button appears only after RAUC validates the signature and compatibility. Start
+the installation and keep power connected while the inactive slot is written;
+the dashboard reports progress and reboots automatically after success.
+Uploads are streamed to `/var/lib/reframe/.updates` with a 2 GiB limit; the
+staged bundle is removed after a successful installation.
 
 Artifacts are written below `build/tmp/deploy/images/reframe/`. The configured
 build produces the stable symlink
