@@ -7,10 +7,9 @@ This repository is an independent Yocto/OpenEmbedded layer. Its current layout i
 - `conf/layer.conf` — layer registration, dependencies, and Wrynose compatibility.
 - `recipes-core/images/` — image recipes, beginning with the hardware bring-up target.
 - `kas/` — pinned repositories and canonical build configuration.
-- `docs/` — dependency mapping and future hardware/boot documentation.
 - `recipes-*/<component>/files/` — patches, services, and configuration owned by a recipe.
 
-Keep files close to the recipe that owns them. Add shared BitBake classes under `classes/` and Python helpers under `lib/` only when reuse justifies them. Update `README.md` whenever supported hardware or build configuration changes.
+Keep files close to the recipe that owns them. Add shared BitBake classes under `classes/` and Python helpers under `lib/` only when reuse justifies them. Keep `README.md` limited to the essential build, flash, and update workflow.
 
 ## Build, Test, and Development Commands
 
@@ -35,7 +34,7 @@ Use four spaces in BitBake and Python files; do not use tabs. Name recipes `<com
 
 ## Testing Guidelines
 
-No automated test suite or coverage target exists yet. The baseline is a clean metadata parse and a successful affected recipe or image build. For hardware changes, document target-side checks and tested board revisions. Current bring-up checks include `/dev/i2c*`, `/dev/spidev*`, camera/media devices, relevant `dmesg` output, and successful systemd startup.
+No automated test suite or coverage target exists yet. The baseline is a clean metadata parse and a successful affected recipe or image build. Test hardware-dependent changes on the target device before submitting them.
 
 ## Commit & Pull Request Guidelines
 
