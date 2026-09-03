@@ -1,0 +1,28 @@
+From 0000000000000000000000000000000000000007 Mon Sep 17 00:00:00 2001
+From: Codex <codex@openai.com>
+Date: Thu, 3 Sep 2026 19:35:00 +0000
+Subject: [PATCH] dashboard: keep update controls locked
+
+Keep upload and installation controls disabled until the asynchronous RAUC
+operation finishes.
+
+Upstream-Status: Inappropriate [Yocto appliance update policy]
+---
+Index: reframe-app-0.3+git/dashboard.py
+===================================================================
+--- reframe-app-0.3+git.orig/dashboard.py
++++ reframe-app-0.3+git/dashboard.py
+@@ -2457,11 +2457,12 @@ async def dashboard():
+                         monitorUpdateInstall();
+                     } else {
+                         status.textContent = data.detail || 'Could not install update.';
++                        uploadBtn.disabled = false;
++                        installBtn.disabled = false;
+                     }
+                 } catch (error) {
+                     console.error('Error installing update:', error);
+                     status.textContent = 'Could not install update.';
+-                } finally {
+                     uploadBtn.disabled = false;
+                     installBtn.disabled = false;
+                 }

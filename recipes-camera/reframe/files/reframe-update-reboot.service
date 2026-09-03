@@ -1,0 +1,7 @@
+[Unit]
+Description=Reboot into an installed reFrame update
+
+[Service]
+Type=oneshot
+ExecStartPre=/bin/rm -f /var/lib/reframe/.updates/reboot-required
+ExecStart=/usr/bin/systemctl --no-block reboot

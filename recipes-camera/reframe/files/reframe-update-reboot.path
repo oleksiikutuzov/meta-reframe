@@ -1,0 +1,9 @@
+[Unit]
+Description=Watch for a successfully installed reFrame update
+
+[Path]
+PathExists=/var/lib/reframe/.updates/reboot-required
+Unit=reframe-update-reboot.service
+
+[Install]
+WantedBy=multi-user.target
