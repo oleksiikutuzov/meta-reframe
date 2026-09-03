@@ -1,0 +1,202 @@
+From 0000000000000000000000000000000000000006 Mon Sep 17 00:00:00 2001
+From: Codex <codex@openai.com>
+Date: Thu, 3 Sep 2026 19:20:00 +0000
+Subject: [PATCH] dashboard: show update progress and reboot
+
+Report browser upload and RAUC installation progress, then request a reboot
+through a narrowly scoped systemd path unit after a successful installation.
+
+Upstream-Status: Inappropriate [Yocto appliance update policy]
+---
+Index: reframe-app-0.3+git/dashboard.py
+===================================================================
+--- reframe-app-0.3+git.orig/dashboard.py
++++ reframe-app-0.3+git/dashboard.py
+@@ -10,6 +10,7 @@ import shutil
+ import math
+ import tempfile
+ import threading
++import re
+ from io import BytesIO
+ from datetime import datetime, timezone
+ from pathlib import Path
+@@ -37,6 +38,7 @@ UPDATE_UPLOAD_DIR = os.path.join(DATA_PA
+ UPDATE_BUNDLE_PATH = os.path.join(UPDATE_UPLOAD_DIR, "pending.raucb")
+ UPDATE_MAX_BYTES = 2 * 1024 * 1024 * 1024
+ UPDATE_COMPATIBLE = os.environ.get("REFRAME_RAUC_COMPATIBLE", "reframe")
++UPDATE_REBOOT_MARKER = os.path.join(UPDATE_UPLOAD_DIR, "reboot-required")
+ 
+ update_install_task = None
+ update_install_state: Dict[str, Any] = {
+@@ -48,6 +50,7 @@ update_install_state: Dict[str, Any] = {
+     ),
+     "bundle_ready": os.path.exists(UPDATE_BUNDLE_PATH),
+     "reboot_required": False,
++    "progress": 0,
+ }
+ 
+ os.makedirs(PHOTOS_PATH, exist_ok=True)
+@@ -1703,6 +1706,7 @@ async def dashboard():
+                         <input id="update-bundle-file" class="setting-input" type="file" accept=".raucb,application/octet-stream">
+                         <button class="button" id="update-upload-btn" onclick="uploadUpdateBundle()" type="button">upload and verify bundle</button>
+                         <button class="button" id="update-install-btn" onclick="installUpdate()" type="button" style="display: none;">install system update</button>
++                        <progress id="update-progress" max="100" value="0" style="display: none; width: 100%; margin-top: 0.75rem;"></progress>
+                         <div class="setting-help" id="update-status">Upload a signed RAUC bundle. Photos and settings are preserved.</div>
+                     </div>
+                 </div>
+@@ -2350,10 +2354,23 @@ async def dashboard():
+                 const status = document.getElementById('update-status');
+                 const installBtn = document.getElementById('update-install-btn');
+                 const uploadBtn = document.getElementById('update-upload-btn');
++                const progress = document.getElementById('update-progress');
+                 status.textContent = data.message || 'Update status checked.';
+                 installBtn.style.display = data.bundle_ready ? 'inline-block' : 'none';
+                 installBtn.disabled = data.status === 'installing';
+                 uploadBtn.disabled = data.status === 'installing';
++                if (typeof data.progress === 'number' && (data.status === 'installing' || data.status === 'rebooting')) {
++                    progress.style.display = 'block';
++                    progress.value = Math.max(0, Math.min(100, data.progress));
++                } else if (data.status !== 'uploading') {
++                    progress.style.display = 'none';
++                }
++            }
++
++            function setUpdateProgress(value, visible = true) {
++                const progress = document.getElementById('update-progress');
++                progress.style.display = visible ? 'block' : 'none';
++                progress.value = Math.max(0, Math.min(100, value));
+             }
+ 
+             async function checkForUpdates() {
+@@ -2381,23 +2398,38 @@ async def dashboard():
+ 
+                 try {
+                     uploadBtn.disabled = true;
+-                    status.textContent = 'Uploading and verifying signed bundle...';
+-                    const response = await fetch('/api/update/upload', {
+-                        method: 'POST',
+-                        headers: {
+-                            'Content-Type': 'application/octet-stream',
+-                            'X-Reframe-Filename': bundle.name
+-                        },
+-                        body: bundle
++                    setUpdateProgress(0);
++                    status.textContent = 'Uploading bundle: 0%';
++                    const data = await new Promise((resolve, reject) => {
++                        const request = new XMLHttpRequest();
++                        request.open('POST', '/api/update/upload');
++                        request.setRequestHeader('Content-Type', 'application/octet-stream');
++                        request.setRequestHeader('X-Reframe-Filename', bundle.name);
++                        request.upload.onprogress = event => {
++                            if (!event.lengthComputable) return;
++                            const percent = Math.round((event.loaded / event.total) * 100);
++                            setUpdateProgress(percent);
++                            status.textContent = `Uploading bundle: ${percent}%`;
++                        };
++                        request.upload.onload = () => {
++                            setUpdateProgress(100);
++                            status.textContent = 'Upload complete. Verifying signature...';
++                        };
++                        request.onerror = () => reject(new Error('Bundle upload failed.'));
++                        request.onload = () => {
++                            let body = {};
++                            try { body = JSON.parse(request.responseText || '{}'); } catch (_) {}
++                            if (request.status >= 200 && request.status < 300) resolve(body);
++                            else reject(new Error(body.detail || 'Bundle upload failed.'));
++                        };
++                        request.send(bundle);
+                     });
+-                    const data = await response.json().catch(() => ({}));
+-                    if (!response.ok) {
+-                        throw new Error(data.detail || 'Bundle upload failed.');
+-                    }
++                    setUpdateProgress(100, false);
+                     updateSoftwareStatus(data);
+                 } catch (error) {
+                     console.error('Update upload error:', error);
+                     status.textContent = error.message || 'Bundle upload failed.';
++                    setUpdateProgress(0, false);
+                 } finally {
+                     uploadBtn.disabled = false;
+                 }
+@@ -2415,6 +2447,7 @@ async def dashboard():
+                 try {
+                     uploadBtn.disabled = true;
+                     installBtn.disabled = true;
++                    setUpdateProgress(0);
+                     status.textContent = 'Starting RAUC installation...';
+                     const response = await fetch('/api/update/install', { method: 'POST' });
+                     const data = await response.json().catch(() => ({}));
+@@ -2441,6 +2474,8 @@ async def dashboard():
+                     updateSoftwareStatus(data);
+                     if (response.ok && data.status === 'installing') {
+                         setTimeout(monitorUpdateInstall, 2000);
++                    } else if (response.ok && data.status === 'rebooting') {
++                        setTimeout(monitorUpdateInstall, 1000);
+                     }
+                 } catch (error) {
+                     console.error('Update status error:', error);
+@@ -3347,27 +3382,56 @@ async def run_rauc_install() -> None:
+         "message": "RAUC is writing the inactive system slot. Do not remove power.",
+         "bundle_ready": True,
+         "reboot_required": False,
++        "progress": 0,
+     })
+ 
+-    result = await run_repo_command(
+-        ["rauc", "install", UPDATE_BUNDLE_PATH],
+-        timeout=1800,
++    output_lines = []
++    process = await asyncio.create_subprocess_exec(
++        "rauc", "install", "--progress", UPDATE_BUNDLE_PATH,
++        stdout=asyncio.subprocess.PIPE,
++        stderr=asyncio.subprocess.STDOUT,
+     )
+-    if result["returncode"] == 0:
++    try:
++        async with asyncio.timeout(1800):
++            while process.stdout:
++                raw_line = await process.stdout.readline()
++                if not raw_line:
++                    break
++                line = raw_line.decode("utf-8", errors="replace").strip()
++                output_lines.append(line)
++                match = re.search(r"(\d{1,3})%", line)
++                if match:
++                    progress = max(0, min(100, int(match.group(1))))
++                    update_install_state.update({
++                        "progress": progress,
++                        "message": f"Installing system update: {progress}%",
++                    })
++            returncode = await process.wait()
++    except TimeoutError:
++        process.kill()
++        await process.wait()
++        returncode = -1
++        output_lines.append("RAUC installation timed out")
++
++    if returncode == 0:
+         Path(UPDATE_BUNDLE_PATH).unlink(missing_ok=True)
+         update_install_state.update({
+-            "status": "installed",
+-            "message": "Update installed successfully. Reboot to start the new system slot.",
++            "status": "rebooting",
++            "message": "Update installed successfully. Rebooting automatically...",
+             "bundle_ready": False,
+             "reboot_required": True,
++            "progress": 100,
+         })
++        await asyncio.sleep(5)
++        Path(UPDATE_REBOOT_MARKER).touch()
+     else:
+-        detail = git_error_detail(result, "RAUC installation failed")
++        detail = "\n".join(output_lines[-10:]) or "RAUC installation failed"
+         update_install_state.update({
+             "status": "error",
+             "message": f"Update installation failed: {detail}",
+             "bundle_ready": os.path.exists(UPDATE_BUNDLE_PATH),
+             "reboot_required": False,
++            "progress": 0,
+         })
+ 
+ @app.post("/api/update/install")

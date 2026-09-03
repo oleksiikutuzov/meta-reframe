@@ -19,9 +19,14 @@ SRC_URI = " \
     file://0001-paths-Separate-immutable-code-from-writable-state.patch \
     file://0002-dashboard-Separate-immutable-code-from-state.patch \
     file://0003-display-Use-libgpiod-for-Raspberry-Pi-GPIO.patch \
+    file://0004-dashboard-Install-signed-RAUC-bundles.patch \
     file://0005-capture-Save-images-atomically.patch \
+    file://0006-dashboard-Show-update-progress-and-reboot.patch \
+    file://0007-dashboard-Keep-update-controls-locked.patch \
     file://reframe-display-test \
     file://reframe-dashboard.service \
+    file://reframe-update-reboot.path \
+    file://reframe-update-reboot.service \
     file://reframe.service \
     file://reframe-settings.json \
     file://99-reframe-hardware.rules \
@@ -35,7 +40,7 @@ USERADD_PACKAGES = "${PN}"
 GROUPADD_PARAM:${PN} = "--system i2c"
 USERADD_PARAM:${PN} = "--system --no-create-home --home-dir ${localstatedir}/lib/reframe --shell /sbin/nologin --groups video,i2c --user-group reframe"
 
-SYSTEMD_SERVICE:${PN} = "reframe.service reframe-dashboard.service"
+SYSTEMD_SERVICE:${PN} = "reframe.service reframe-dashboard.service reframe-update-reboot.path"
 SYSTEMD_AUTO_ENABLE:${PN} = "enable"
 
 RDEPENDS:${PN} = " \
@@ -52,6 +57,7 @@ RDEPENDS:${PN} = " \
     python3-smbus2 \
     python3-spidev \
     python3-uvicorn \
+    rauc \
     v4l-utils \
 "
 
@@ -75,6 +81,8 @@ do_install() {
     install -d ${D}${systemd_system_unitdir}
     install -m 0644 ${UNPACKDIR}/reframe.service ${D}${systemd_system_unitdir}/reframe.service
     install -m 0644 ${UNPACKDIR}/reframe-dashboard.service ${D}${systemd_system_unitdir}/reframe-dashboard.service
+    install -m 0644 ${UNPACKDIR}/reframe-update-reboot.path ${D}${systemd_system_unitdir}/reframe-update-reboot.path
+    install -m 0644 ${UNPACKDIR}/reframe-update-reboot.service ${D}${systemd_system_unitdir}/reframe-update-reboot.service
 
     install -d ${D}${nonarch_base_libdir}/udev/rules.d
     install -m 0644 ${UNPACKDIR}/99-reframe-hardware.rules ${D}${nonarch_base_libdir}/udev/rules.d/99-reframe-hardware.rules
@@ -84,6 +92,7 @@ FILES:${PN} += " \
     ${libdir}/reframe \
     ${localstatedir}/lib/reframe \
     ${nonarch_base_libdir}/udev/rules.d/99-reframe-hardware.rules \
+    ${systemd_system_unitdir}/reframe-update-reboot.service \
 "
 
 CONFFILES:${PN} = "${localstatedir}/lib/reframe/settings.json"

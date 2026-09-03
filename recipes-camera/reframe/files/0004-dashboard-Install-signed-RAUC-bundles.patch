@@ -1,0 +1,403 @@
+From 0000000000000000000000000000000000000004 Mon Sep 17 00:00:00 2001
+From: Codex <codex@openai.com>
+Date: Fri, 28 Aug 2026 23:45:00 +0000
+Subject: [PATCH] dashboard: install signed RAUC bundles
+
+Replace the source-tree updater UI and API with bounded bundle staging,
+signature verification, asynchronous RAUC installation, and status polling.
+
+Upstream-Status: Inappropriate [Yocto appliance update policy]
+---
+diff --git a/dashboard.py b/dashboard.py
+index a6241a8..48efd53 100644
+--- a/dashboard.py
++++ b/dashboard.py
+@@ -33,6 +33,22 @@ SETTINGS_PATH = os.path.join(DATA_PATH, "settings.json")
+ USER_DATA_PATHS = ["settings.json", "photos", "dithered_photos"]
+ UPDATE_HELPER_PATH = "/usr/local/sbin/reframe-apply-update"
+ UPDATE_PENDING_PATH = os.path.join(DATA_PATH, ".runtime", "update_pending")
++UPDATE_UPLOAD_DIR = os.path.join(DATA_PATH, ".updates")
++UPDATE_BUNDLE_PATH = os.path.join(UPDATE_UPLOAD_DIR, "pending.raucb")
++UPDATE_MAX_BYTES = 2 * 1024 * 1024 * 1024
++UPDATE_COMPATIBLE = os.environ.get("REFRAME_RAUC_COMPATIBLE", "reframe")
++
++update_install_task = None
++update_install_state: Dict[str, Any] = {
++    "status": "ready" if os.path.exists(UPDATE_BUNDLE_PATH) else "idle",
++    "message": (
++        "A verified bundle is ready to install."
++        if os.path.exists(UPDATE_BUNDLE_PATH)
++        else "Upload a signed .raucb bundle to update the system image."
++    ),
++    "bundle_ready": os.path.exists(UPDATE_BUNDLE_PATH),
++    "reboot_required": False,
++}
+ 
+ os.makedirs(PHOTOS_PATH, exist_ok=True)
+ os.makedirs(DITHERED_PHOTOS_PATH, exist_ok=True)
+@@ -1684,9 +1700,10 @@ async def dashboard():
+                 <div class="settings-section settings-updates">
+                     <h3>software updates</h3>
+                     <div class="setting-group">
+-                        <button class="button" id="update-check-btn" type="button" disabled>updates managed by system image</button>
+-                        <button class="button" id="update-install-btn" type="button" disabled style="display: none;">install update</button>
+-                        <div class="setting-help" id="update-status">Software updates are managed by the reFrame system image.</div>
++                        <input id="update-bundle-file" class="setting-input" type="file" accept=".raucb,application/octet-stream">
++                        <button class="button" id="update-upload-btn" onclick="uploadUpdateBundle()" type="button">upload and verify bundle</button>
++                        <button class="button" id="update-install-btn" onclick="installUpdate()" type="button" style="display: none;">install system update</button>
++                        <div class="setting-help" id="update-status">Upload a signed RAUC bundle. Photos and settings are preserved.</div>
+                     </div>
+                 </div>
+ 
+@@ -2295,8 +2312,9 @@ async def dashboard():
+                 document.getElementById('show-dashboard-qr-on-wifi-connect').value = settings.system.show_dashboard_qr_on_wifi_connect !== false ? 'true' : 'false';
+                 const exportSettings = settings.exports || {};
+                 document.getElementById('upscale-dithered-2x').value = exportSettings.upscale_dithered_2x ? 'true' : 'false';
+-                document.getElementById('update-status').textContent = 'Software updates are managed by the reFrame system image.';
++                document.getElementById('update-status').textContent = 'Upload a signed RAUC bundle. Photos and settings are preserved.';
+                 document.getElementById('update-install-btn').style.display = 'none';
++                checkForUpdates();
+ 
+                 const arenaSettings = (settings.extensions && settings.extensions.arena) || {};
+                 document.getElementById('arena-enabled').value = arenaSettings.enabled ? 'true' : 'false';
+@@ -2331,68 +2349,104 @@ async def dashboard():
+             function updateSoftwareStatus(data) {
+                 const status = document.getElementById('update-status');
+                 const installBtn = document.getElementById('update-install-btn');
++                const uploadBtn = document.getElementById('update-upload-btn');
+                 status.textContent = data.message || 'Update status checked.';
+-                installBtn.style.display = data.can_update ? 'inline-block' : 'none';
++                installBtn.style.display = data.bundle_ready ? 'inline-block' : 'none';
++                installBtn.disabled = data.status === 'installing';
++                uploadBtn.disabled = data.status === 'installing';
+             }
+ 
+             async function checkForUpdates() {
+-                const status = document.getElementById('update-status');
+-                const checkBtn = document.getElementById('update-check-btn');
+-                const installBtn = document.getElementById('update-install-btn');
+-
+                 try {
+-                    checkBtn.disabled = true;
+-                    installBtn.style.display = 'none';
+-                    status.textContent = 'Checking for updates...';
+                     const response = await fetch('/api/update/status');
+                     const data = await response.json().catch(() => ({}));
++                    updateSoftwareStatus(response.ok ? data : {
++                        message: data.detail || 'Could not check update status.'
++                    });
++                } catch (error) {
++                    console.error('Error checking for updates:', error);
++                    updateSoftwareStatus({ message: 'Could not check update status.' });
++                }
++            }
+ 
+-                    if (response.ok) {
+-                        updateSoftwareStatus(data);
+-                    } else {
+-                        status.textContent = data.detail || 'Could not check for updates.';
++            async function uploadUpdateBundle() {
++                const input = document.getElementById('update-bundle-file');
++                const uploadBtn = document.getElementById('update-upload-btn');
++                const status = document.getElementById('update-status');
++                const bundle = input.files[0];
++                if (!bundle || !bundle.name.toLowerCase().endsWith('.raucb')) {
++                    status.textContent = 'Choose a .raucb bundle first.';
++                    return;
++                }
++
++                try {
++                    uploadBtn.disabled = true;
++                    status.textContent = 'Uploading and verifying signed bundle...';
++                    const response = await fetch('/api/update/upload', {
++                        method: 'POST',
++                        headers: {
++                            'Content-Type': 'application/octet-stream',
++                            'X-Reframe-Filename': bundle.name
++                        },
++                        body: bundle
++                    });
++                    const data = await response.json().catch(() => ({}));
++                    if (!response.ok) {
++                        throw new Error(data.detail || 'Bundle upload failed.');
+                     }
++                    updateSoftwareStatus(data);
+                 } catch (error) {
+-                    console.error('Error checking for updates:', error);
+-                    status.textContent = 'Could not check for updates.';
++                    console.error('Update upload error:', error);
++                    status.textContent = error.message || 'Bundle upload failed.';
+                 } finally {
+-                    checkBtn.disabled = false;
++                    uploadBtn.disabled = false;
+                 }
+             }
+ 
+             async function installUpdate() {
+                 const status = document.getElementById('update-status');
+-                const checkBtn = document.getElementById('update-check-btn');
++                const uploadBtn = document.getElementById('update-upload-btn');
+                 const installBtn = document.getElementById('update-install-btn');
+ 
+-                if (!confirm('Install the available update? The camera should be rebooted after the update finishes.')) {
++                if (!confirm('Install this signed system image into the inactive slot? Do not remove power during installation.')) {
+                     return;
+                 }
+ 
+                 try {
+-                    checkBtn.disabled = true;
++                    uploadBtn.disabled = true;
+                     installBtn.disabled = true;
+-                    status.textContent = 'Installing update...';
++                    status.textContent = 'Starting RAUC installation...';
+                     const response = await fetch('/api/update/install', { method: 'POST' });
+                     const data = await response.json().catch(() => ({}));
+ 
+                     if (response.ok) {
+-                        status.textContent = data.message || 'Update installed. Reboot the camera to finish.';
+-                        installBtn.style.display = 'none';
++                        updateSoftwareStatus(data);
++                        monitorUpdateInstall();
+                     } else {
+                         status.textContent = data.detail || 'Could not install update.';
+-                        if (data.can_update) {
+-                            installBtn.style.display = 'inline-block';
+-                        }
+                     }
+                 } catch (error) {
+                     console.error('Error installing update:', error);
+                     status.textContent = 'Could not install update.';
+                 } finally {
+-                    checkBtn.disabled = false;
++                    uploadBtn.disabled = false;
+                     installBtn.disabled = false;
+                 }
+             }
++
++            async function monitorUpdateInstall() {
++                try {
++                    const response = await fetch('/api/update/status');
++                    const data = await response.json().catch(() => ({}));
++                    updateSoftwareStatus(data);
++                    if (response.ok && data.status === 'installing') {
++                        setTimeout(monitorUpdateInstall, 2000);
++                    }
++                } catch (error) {
++                    console.error('Update status error:', error);
++                    setTimeout(monitorUpdateInstall, 5000);
++                }
++            }
+             
+             async function saveSettings() {
+                 try {
+@@ -3201,94 +3255,134 @@ async def update_settings(request: Request):
+ 
+ @app.get("/api/update/status")
+ async def update_status():
+-    """Check whether the git checkout has a fast-forward update available."""
+-    return await get_update_status(fetch=True)
++    """Return dashboard-owned RAUC upload and installation state."""
++    return dict(update_install_state)
+ 
+-@app.post("/api/update/install")
+-async def install_update():
+-    """Pull a fast-forward update and apply its dependencies and service files."""
+-    status = await get_update_status(fetch=True)
+ 
+-    if status["up_to_date"] and not status["post_install_pending"]:
+-        return {
+-            **status,
+-            "status": "success",
+-            "message": "Software is already up to date."
+-        }
++@app.post("/api/update/upload")
++async def upload_update(request: Request):
++    """Stream a signed RAUC bundle to persistent staging and verify it."""
++    if update_install_state["status"] == "installing":
++        raise HTTPException(status_code=409, detail="An update is already installing")
+ 
+-    if status["diverged"]:
+-        raise HTTPException(
+-            status_code=409,
+-            detail="This checkout has diverged from upstream and cannot be updated automatically"
+-        )
+-
+-    if status["has_tracked_changes"]:
+-        raise HTTPException(
+-            status_code=409,
+-            detail="Local code changes must be committed or discarded before updating"
+-        )
++    filename = request.headers.get("x-reframe-filename", "")
++    if not filename.lower().endswith(".raucb"):
++        raise HTTPException(status_code=400, detail="Only .raucb bundles are accepted")
+ 
+-    if not status["update_available"] and not status["post_install_pending"]:
+-        raise HTTPException(status_code=409, detail="No automatic update is available")
++    content_length = request.headers.get("content-length")
++    if content_length:
++        try:
++            if int(content_length) > UPDATE_MAX_BYTES:
++                raise HTTPException(status_code=413, detail="Bundle exceeds the 2 GiB upload limit")
++        except ValueError:
++            raise HTTPException(status_code=400, detail="Invalid Content-Length header")
+ 
+-    preserved_paths = ignored_user_data_paths()
+-    backup_dir = None
+-    pull_output = ""
++    update_dir = Path(UPDATE_UPLOAD_DIR)
++    update_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
++    temporary_path = update_dir / "upload.tmp"
++    received = 0
+ 
+-    if not os.path.exists(UPDATE_HELPER_PATH):
+-        raise HTTPException(
+-            status_code=501,
+-            detail="Update installer is missing. Run install.sh once over SSH to enable complete updates."
++    try:
++        with temporary_path.open("wb") as output:
++            async for chunk in request.stream():
++                received += len(chunk)
++                if received > UPDATE_MAX_BYTES:
++                    raise HTTPException(status_code=413, detail="Bundle exceeds the 2 GiB upload limit")
++                output.write(chunk)
++
++        if received == 0:
++            raise HTTPException(status_code=400, detail="Uploaded bundle is empty")
++
++        verify_result = await run_repo_command(
++            ["rauc", "info", "--output-format=json-2", str(temporary_path)],
++            timeout=120,
+         )
++        if verify_result["returncode"] != 0:
++            detail = git_error_detail(verify_result, "RAUC rejected the bundle")
++            raise HTTPException(status_code=400, detail=f"Bundle verification failed: {detail}")
+ 
+-    if status["update_available"]:
+-        backup_dir = backup_settings_for_update()
+-        upstream = status["upstream"]
+-        pull_args = ["pull", "--ff-only"]
+-        if "/" in upstream:
+-            remote, branch = upstream.split("/", 1)
+-            pull_args.extend([remote, branch])
+-
+-        pull_result = await run_git(pull_args, timeout=180)
+-        if pull_result["returncode"] != 0:
+-            detail = git_error_detail(pull_result, "git pull failed")
+-            raise HTTPException(status_code=500, detail=f"Could not install update: {detail}")
+-        pull_output = pull_result["stdout"]
+-
+-        pending_path = Path(UPDATE_PENDING_PATH)
+-        pending_path.parent.mkdir(parents=True, exist_ok=True)
+-        pending_path.write_text(status["remote_revision"] + "\n", encoding="utf-8")
+-
+-    apply_result = await run_repo_command(
+-        ["sudo", "-n", UPDATE_HELPER_PATH],
+-        timeout=300
++        try:
++            bundle_info = json.loads(verify_result["stdout"])
++            update_info = bundle_info.get("update", {})
++            bundle_compatible = update_info.get("compatible")
++            bundle_version = update_info.get("version") or "unspecified"
++        except (AttributeError, json.JSONDecodeError) as error:
++            raise HTTPException(status_code=400, detail=f"Could not read bundle manifest: {error}")
++
++        if bundle_compatible != UPDATE_COMPATIBLE:
++            raise HTTPException(
++                status_code=400,
++                detail=(
++                    f"Bundle is for {bundle_compatible or 'an unknown system'}, "
++                    f"not {UPDATE_COMPATIBLE}"
++                ),
++            )
++
++        os.replace(temporary_path, UPDATE_BUNDLE_PATH)
++        update_install_state.update({
++            "status": "ready",
++            "message": (
++                f"Signed {bundle_compatible} bundle {bundle_version} verified "
++                f"({received / (1024 * 1024):.1f} MiB). Ready to install."
++            ),
++            "bundle_ready": True,
++            "reboot_required": False,
++            "size_bytes": received,
++            "version": bundle_version,
++        })
++        return dict(update_install_state)
++    except HTTPException:
++        temporary_path.unlink(missing_ok=True)
++        raise
++    except Exception as error:
++        temporary_path.unlink(missing_ok=True)
++        logging.exception("RAUC bundle upload failed")
++        raise HTTPException(status_code=500, detail=f"Could not store bundle: {error}")
++
++
++async def run_rauc_install() -> None:
++    """Install the already verified bundle without blocking an HTTP request."""
++    update_install_state.update({
++        "status": "installing",
++        "message": "RAUC is writing the inactive system slot. Do not remove power.",
++        "bundle_ready": True,
++        "reboot_required": False,
++    })
++
++    result = await run_repo_command(
++        ["rauc", "install", UPDATE_BUNDLE_PATH],
++        timeout=1800,
+     )
+-    if apply_result["returncode"] != 0:
+-        detail = git_error_detail(apply_result, "post-update installation failed")
+-        raise HTTPException(
+-            status_code=500,
+-            detail=f"Code was updated, but installation did not finish: {detail}"
+-        )
++    if result["returncode"] == 0:
++        Path(UPDATE_BUNDLE_PATH).unlink(missing_ok=True)
++        update_install_state.update({
++            "status": "installed",
++            "message": "Update installed successfully. Reboot to start the new system slot.",
++            "bundle_ready": False,
++            "reboot_required": True,
++        })
++    else:
++        detail = git_error_detail(result, "RAUC installation failed")
++        update_install_state.update({
++            "status": "error",
++            "message": f"Update installation failed: {detail}",
++            "bundle_ready": os.path.exists(UPDATE_BUNDLE_PATH),
++            "reboot_required": False,
++        })
+ 
+-    try:
+-        os.unlink(UPDATE_PENDING_PATH)
+-    except FileNotFoundError:
+-        pass
++@app.post("/api/update/install")
++async def install_update():
++    """Start installation of the staged bundle in the inactive RAUC slot."""
++    global update_install_task
+ 
+-    new_status = await get_update_status(fetch=False)
+-    message = "Update installed. Reboot the camera to finish."
+-    if backup_dir:
+-        message = f"{message} Settings backup: {backup_dir}"
++    if update_install_task and not update_install_task.done():
++        raise HTTPException(status_code=409, detail="An update is already installing")
++    if not os.path.isfile(UPDATE_BUNDLE_PATH):
++        raise HTTPException(status_code=409, detail="Upload and verify a bundle first")
+ 
+-    return {
+-        **new_status,
+-        "status": "success",
+-        "message": message,
+-        "backup_dir": backup_dir,
+-        "preserved_paths": preserved_paths,
+-        "pull_output": pull_output,
+-        "apply_output": apply_result["stdout"]
+-    }
++    update_install_task = asyncio.create_task(run_rauc_install())
++    await asyncio.sleep(0)
++    return dict(update_install_state)
+ 
+ @app.get("/api/extensions/actions")
+ async def get_extension_actions():
