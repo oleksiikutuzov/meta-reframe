@@ -19,6 +19,7 @@ CSRF_TOKEN = secrets.token_urlsafe(24)
 DASHBOARD_HOST = "127.0.0.1"
 DASHBOARD_PORT = 8000
 MAX_DASHBOARD_REQUEST_BYTES = 64 * 1024 * 1024
+MAX_UPDATE_BUNDLE_BYTES = 2 * 1024 * 1024 * 1024
 
 
 def nmcli(*args, timeout=40, check=True):
@@ -196,11 +197,18 @@ class Handler(BaseHTTPRequestHandler):
 
     def proxy_dashboard(self, method=None, send_body=True):
         length = int(self.headers.get("Content-Length", "0") or "0")
-        if length > MAX_DASHBOARD_REQUEST_BYTES:
+        is_update_upload = (
+            (method or self.command) == "POST"
+            and self.path == "/api/update/upload"
+        )
+        request_limit = (
+            MAX_UPDATE_BUNDLE_BYTES if is_update_upload
+            else MAX_DASHBOARD_REQUEST_BYTES
+        )
+        if length > request_limit:
             self.reply(413, json.dumps({"message": "Request is too large"}))
             return
 
-        body = self.rfile.read(length) if length else None
         headers = {
             key: value
             for key, value in self.headers.items()
@@ -217,9 +225,29 @@ class Handler(BaseHTTPRequestHandler):
         headers["X-Forwarded-Host"] = self.headers.get("Host", "")
         headers["X-Forwarded-Proto"] = "http"
 
-        connection = HTTPConnection(DASHBOARD_HOST, DASHBOARD_PORT, timeout=30)
+        timeout = 1800 if is_update_upload else 30
+        connection = HTTPConnection(DASHBOARD_HOST, DASHBOARD_PORT, timeout=timeout)
         try:
-            connection.request(method or self.command, self.path, body=body, headers=headers)
+            if is_update_upload:
+                connection.putrequest(
+                    method or self.command,
+                    self.path,
+                    skip_host=True,
+                    skip_accept_encoding=True,
+                )
+                for key, value in headers.items():
+                    connection.putheader(key, value)
+                connection.endheaders()
+                remaining = length
+                while remaining:
+                    chunk = self.rfile.read(min(64 * 1024, remaining))
+                    if not chunk:
+                        raise OSError("Update upload ended before Content-Length")
+                    connection.send(chunk)
+                    remaining -= len(chunk)
+            else:
+                body = self.rfile.read(length) if length else None
+                connection.request(method or self.command, self.path, body=body, headers=headers)
             response = connection.getresponse()
             self.send_response(response.status, response.reason)
             for key, value in response.getheaders():

@@ -7,6 +7,8 @@ SRC_URI = " \
     file://captive-portal.conf \
     file://reframe-network.py \
     file://reframe-network.service \
+    file://reframe-network-persistence \
+    file://reframe-network-persistence.service \
     file://reframe-wifi-import.py \
     file://reframe-wifi-import.service \
 "
@@ -14,7 +16,7 @@ S = "${UNPACKDIR}"
 
 inherit allarch systemd
 
-SYSTEMD_SERVICE:${PN} = "reframe-wifi-import.service reframe-network.service"
+SYSTEMD_SERVICE:${PN} = "reframe-network-persistence.service reframe-wifi-import.service reframe-network.service"
 SYSTEMD_AUTO_ENABLE:${PN} = "enable"
 
 RDEPENDS:${PN} = " \
@@ -36,10 +38,12 @@ RDEPENDS:${PN} = " \
 do_install() {
     install -d ${D}${libexecdir}
     install -m 0755 ${UNPACKDIR}/reframe-network.py ${D}${libexecdir}/reframe-network
+    install -m 0755 ${UNPACKDIR}/reframe-network-persistence ${D}${libexecdir}/reframe-network-persistence
     install -m 0755 ${UNPACKDIR}/reframe-wifi-import.py ${D}${libexecdir}/reframe-wifi-import
 
     install -d ${D}${systemd_system_unitdir}
     install -m 0644 ${UNPACKDIR}/reframe-network.service ${D}${systemd_system_unitdir}/reframe-network.service
+    install -m 0644 ${UNPACKDIR}/reframe-network-persistence.service ${D}${systemd_system_unitdir}/reframe-network-persistence.service
     install -m 0644 ${UNPACKDIR}/reframe-wifi-import.service ${D}${systemd_system_unitdir}/reframe-wifi-import.service
 
     install -d ${D}${sysconfdir}/NetworkManager/dnsmasq-shared.d

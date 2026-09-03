@@ -1,0 +1,15 @@
+#!/bin/sh
+set -eu
+
+connections=/etc/NetworkManager/system-connections
+persistent=/var/lib/reframe/NetworkManager/system-connections
+
+install -d -m 0700 "$connections" "$persistent"
+
+# Preserve profiles provisioned on an existing slot when persistent storage is
+# initialized for the first time. Subsequent boots always use the shared copy.
+if ! find "$persistent" -mindepth 1 -maxdepth 1 -print -quit | grep -q .; then
+    cp -a "$connections"/. "$persistent"/
+fi
+
+mount --bind "$persistent" "$connections"
