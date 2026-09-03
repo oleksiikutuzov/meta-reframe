@@ -1,0 +1,13 @@
+[Unit]
+Description=Mount persistent reFrame system state
+RequiresMountsFor=/var/lib/reframe
+Before=sshdgenkeys.service sshd.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/libexec/reframe-persistent-state
+ExecStop=/usr/bin/umount /root
+RemainAfterExit=yes
+
+[Install]
+RequiredBy=sshdgenkeys.service

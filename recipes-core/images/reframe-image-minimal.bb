@@ -21,10 +21,21 @@ IMAGE_INSTALL += " \
     libcamera-apps \
     python3-picamera2 \
     pisugar-power-manager-rs \
+    rauc \
+    kernel-image \
+    kernel-modules \
     reframe-app \
     reframe-network \
+    reframe-persistent-state \
     reframe-pisugar \
+    reframe-rauc-storage \
+    u-boot-env \
+    util-linux-lsblk \
 "
+
+# U-Boot loads the kernel from the selected RAUC rootfs slot. Do not also put
+# a second kernel copy in the shared firmware partition.
+RPI_EXTRA_IMAGE_BOOT_FILES:remove = "${KERNEL_IMAGETYPE}"
 
 # These generic-image services have no role on the appliance. Apply masks only
 # after package postinst scripts have installed/enabled their units; shipping

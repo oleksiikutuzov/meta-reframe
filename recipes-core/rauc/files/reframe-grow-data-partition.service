@@ -1,0 +1,15 @@
+[Unit]
+Description=Grow the reFrame persistent data partition
+DefaultDependencies=no
+After=dev-mmcblk0.device
+Before=local-fs-pre.target var-lib-reframe.mount
+Wants=local-fs-pre.target
+ConditionPathExists=/dev/mmcblk0p4
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/sbin/parted --script /dev/mmcblk0 resizepart 4 100%%
+
+[Install]
+WantedBy=local-fs-pre.target
