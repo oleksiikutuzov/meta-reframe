@@ -1,0 +1,13 @@
+[Unit]
+Description=Mount persistent reFrame NetworkManager profiles
+RequiresMountsFor=/var/lib/reframe
+Before=NetworkManager.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/libexec/reframe-network-persistence
+ExecStop=/usr/bin/umount /etc/NetworkManager/system-connections
+RemainAfterExit=yes
+
+[Install]
+RequiredBy=NetworkManager.service
