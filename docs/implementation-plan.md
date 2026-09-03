@@ -93,10 +93,11 @@ Create `reframe-image` with only required runtime content. Separate development
 features, retain pinned revisions, and define image-controlled updates rather
 than application self-modification.
 
-Image-controlled updates are a future deliverable, not a description of the
-current implementation. Until a signed image-level updater with recovery is
-implemented, document backup and SD-card reflashing as the only supported
-upgrade procedure.
+The RAUC foundation provides signed image bundles, redundant root slots,
+rollback, persistent application data, and dashboard upload/install. Before a
+production release, replace the development signing key, validate successful
+activation and forced rollback on hardware, and add dashboard authentication
+if the service will be reachable outside a trusted LAN.
 
 **Exit gate:** A clean production build passes the full hardware test plan,
 meets recorded boot/RAM/storage baselines, contains no credentials or development

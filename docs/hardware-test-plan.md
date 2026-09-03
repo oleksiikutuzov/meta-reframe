@@ -173,8 +173,9 @@ systemctl start reframe.service
 - Record panel revision, refresh time, failures, and relevant service journal.
 
 The dashboard is intentionally unauthenticated and should be used only on a
-trusted LAN. There is no in-system updater: application self-update is disabled,
-and no OTA or package-feed upgrade path is installed. Updating currently means
+trusted LAN. Application self-update remains disabled. System updates use a
+dashboard-uploaded, signed RAUC bundle; no package-feed upgrade path exists.
+Initial migration to the redundant RAUC partition layout still means
 backing up `/var/lib/reframe`, building a replacement image, and reflashing the
 SD card.
 

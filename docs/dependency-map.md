@@ -76,14 +76,15 @@ reFrame
   reFrame.
 - Keep application code immutable under `/usr/lib/reframe` and persistent state
   under `/var/lib/reframe`.
-- There is no in-system update mechanism yet. Do not enable the upstream Git
-  updater or modify files under `/usr/lib/reframe` on a running device. Current
-  upgrades require a newly built image and an explicit backup/reflash workflow;
-  a future OTA design must use authenticated, signed image artifacts and
-  include failure recovery.
+- Signed system-image updates are uploaded through the dashboard and installed
+  by RAUC into the inactive root slot. Do not enable the upstream Git updater
+  or modify files under `/usr/lib/reframe` on a running device. The dashboard
+  can invoke only RAUC's signed-bundle installation method over D-Bus; U-Boot
+  attempt counters provide fallback when a newly installed slot cannot boot.
 - Treat Waveshare, networking/dashboard, and PiSugar support as separate,
   testable integration stages.
-- Keep Wi-Fi credentials in NetworkManager profiles created on the target. The
+- Keep Wi-Fi credentials in NetworkManager profiles created on the target and
+  bind-mounted from persistent storage so both root slots share them. The
   optional plaintext boot-partition JSON is input-only and must be erased after
   import; never put credentials in recipes or application settings.
 - Keep the system-wide dnsmasq service disabled. NetworkManager owns a private
