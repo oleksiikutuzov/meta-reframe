@@ -1,0 +1,34 @@
+#!/bin/sh
+set -eu
+
+state=/var/lib/reframe/system
+persistent_root=$state/root
+persistent_ssh=$state/ssh
+
+install -d -m 0700 "$state" "$persistent_root" "$persistent_ssh"
+
+# Import the first slot's root home, then use the shared copy on every boot.
+if ! find "$persistent_root" -mindepth 1 -maxdepth 1 -print -quit | grep -q .; then
+    cp -a /root/. "$persistent_root"/
+fi
+mount --bind "$persistent_root" /root
+
+# Keep the device's SSH identity stable without persisting sshd configuration,
+# which remains owned by each updated root filesystem.
+if ! find "$persistent_ssh" -name 'ssh_host_*_key' -type f -print -quit | grep -q .; then
+    for key in /etc/ssh/ssh_host_*_key; do
+        test -f "$key" || continue
+        cp -a "$key" "$key.pub" "$persistent_ssh"/
+    done
+fi
+
+if ! find "$persistent_ssh" -name 'ssh_host_*_key' -type f -print -quit | grep -q .; then
+    ssh-keygen -q -t ecdsa -N '' -f "$persistent_ssh/ssh_host_ecdsa_key"
+fi
+
+for key in "$persistent_ssh"/ssh_host_*; do
+    test -f "$key" || continue
+    destination=/etc/ssh/$(basename "$key")
+    rm -f "$destination"
+    ln -s "$key" "$destination"
+done

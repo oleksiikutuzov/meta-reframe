@@ -1,0 +1,38 @@
+fdt addr ${fdt_addr} && fdt get value bootargs /chosen bootargs
+
+test -n "${BOOT_ORDER}" || setenv BOOT_ORDER "A B"
+test -n "${BOOT_A_LEFT}" || setenv BOOT_A_LEFT 3
+test -n "${BOOT_B_LEFT}" || setenv BOOT_B_LEFT 3
+
+setenv bootpart
+setenv raucslot
+
+for BOOT_SLOT in "${BOOT_ORDER}"; do
+  if test -n "${bootpart}"; then
+    true
+  elif test "${BOOT_SLOT}" = "A" && test ${BOOT_A_LEFT} -gt 0; then
+    setexpr BOOT_A_LEFT ${BOOT_A_LEFT} - 1
+    setenv bootpart /dev/mmcblk0p2
+    setenv raucslot A
+    setenv bootdev "mmc 0:2"
+  elif test "${BOOT_SLOT}" = "B" && test ${BOOT_B_LEFT} -gt 0; then
+    setexpr BOOT_B_LEFT ${BOOT_B_LEFT} - 1
+    setenv bootpart /dev/mmcblk0p3
+    setenv raucslot B
+    setenv bootdev "mmc 0:3"
+  fi
+done
+
+if test -z "${bootpart}"; then
+  echo "No bootable RAUC slot; restoring both attempt counters"
+  setenv BOOT_A_LEFT 3
+  setenv BOOT_B_LEFT 3
+  saveenv
+  reset
+fi
+
+setenv bootargs "${bootargs} root=${bootpart} rootwait rw rauc.slot=${raucslot}"
+saveenv
+
+load ${bootdev} ${kernel_addr_r} boot/@@KERNEL_IMAGETYPE@@
+@@KERNEL_BOOTCMD@@ ${kernel_addr_r} - ${fdt_addr}

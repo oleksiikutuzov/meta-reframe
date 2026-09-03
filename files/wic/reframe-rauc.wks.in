@@ -1,0 +1,6 @@
+part /boot --source bootimg-partition --ondisk mmcblk0 --fstype=vfat --label boot --active --align 4096 --size 100 --no-fstab-update
+part / --source rootfs --ondisk mmcblk0 --fstype=ext4 --label rootfs_A --align 4096 --no-fstab-update
+part / --source rootfs --ondisk mmcblk0 --fstype=ext4 --label rootfs_B --align 4096 --no-fstab-update
+part /var/lib/reframe --source rootfs --rootfs-dir=${IMAGE_ROOTFS}/var/lib/reframe --ondisk mmcblk0 --fstype=ext4 --label reframe-data --align 4096 --size 256 --fsoptions "x-systemd.growfs" --no-fstab-update
+
+bootloader --ptable msdos
