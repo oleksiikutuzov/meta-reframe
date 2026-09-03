@@ -1,201 +1,39 @@
 # meta-reframe
 
-`meta-reframe` is an independent Yocto/OpenEmbedded layer for building a
-purpose-built Linux image for the open-source reFrame camera hardware. The
-first target is a Raspberry Pi Zero 2 W (64-bit) with Camera Module 3 (IMX708),
-I2C, and SPI enabled.
+Yocto/OpenEmbedded layer for the reFrame camera, targeting the Raspberry Pi
+Zero 2 W with Camera Module 3, Waveshare Spectra 6 display, PiSugar 3, Wi-Fi
+provisioning, persistent user data, and signed RAUC updates.
 
-The current image integrates the camera application, Waveshare 4-inch Spectra
-6 e-paper display, Wi-Fi provisioning, loopback-backed dashboard, and PiSugar 3
-power and RTC support. A pinned, source-built PiSugar service exposes only
-local control sockets, preserves time across offline boots, and completes board
-shutdown after systemd powers off Linux.
+## Build
 
-## Software update policy
-
-System-image updates use RAUC with signed verity bundles, redundant ext4 root
-filesystems, U-Boot attempt counters, and automatic rollback. The dashboard can
-upload, verify, and install a local `.raucb` into the inactive slot; the
-upstream application's Git updater remains disabled. Because the dashboard is
-intended for a trusted LAN and has no user authentication, do not expose it to
-an untrusted network. RAUC still rejects bundles that are not signed by the
-device trust anchor or do not match the machine compatibility string.
-
-The WIC image has a shared firmware partition, `rootfs_A`, `rootfs_B`, and a
-`reframe-data` partition mounted at `/var/lib/reframe`. On first boot the last
-partition and its filesystem grow to fill the SD card. Photos and settings
-therefore survive root-slot replacement. This layout is incompatible with the
-older single-rootfs image and requires one full-card reflash when adopting
-RAUC. Back up existing `/var/lib/reframe` data before that migration.
-
-The repository contains a public development certificate and its private key
-so developers can build a complete test bundle. They are not production
-credentials. Production builds must keep the signing key outside source
-control, provision the matching trust anchor, and override `RAUC_KEY_FILE` and
-`RAUC_CERT_FILE`.
-
-## Build environment
-
-Yocto Project 6.0 (Wrynose) and `kas` 5.3 are required. The canonical
-configuration is `kas/reframe.yml`; it pins BitBake, OpenEmbedded-Core,
-meta-openembedded, and meta-raspberrypi to the revisions used for the successful
-build on 2026-08-11.
+Install `kas` 5.3, then run from a parent workspace:
 
 ```sh
 mkdir reframe-yocto
 cd reframe-yocto
 git clone https://github.com/oleksiikutuzov/meta-reframe.git
-
 pipx install kas==5.3
 KAS_WORK_DIR="$PWD" kas checkout meta-reframe/kas/reframe.yml
-```
-
-Run kas from the `reframe-yocto` project directory, not from inside the
-`meta-reframe` repository. `KAS_WORK_DIR` keeps all checked-out layers at the
-same level:
-
-```text
-reframe-yocto/
-├── bitbake/
-├── meta-openembedded/
-├── meta-raspberrypi/
-├── meta-reframe/
-├── openembedded-core/
-└── build/
-```
-
-`kas checkout` resolves the pinned repositories and writes `build/conf`. From
-the same project directory, inspect or debug the BitBake environment with:
-
-```sh
-KAS_WORK_DIR="$PWD" kas shell meta-reframe/kas/reframe.yml
-```
-
-## Raspberry Pi Zero 2 W configuration
-
-The kas configuration selects the layer-owned `reframe` machine. That machine
-directly requires meta-raspberrypi's `raspberrypi0-2w-64` definition and owns
-the complete appliance configuration, including development policy, hardware,
-hostname, firmware licence acceptance, and headless speed settings:
-
-```sh
-DEBUG_BUILD = "1"
-INIT_MANAGER = "systemd"
-ENABLE_I2C = "1"
-ENABLE_SPI_BUS = "1"
-ENABLE_UART = "${@oe.utils.vartrue('DEBUG_BUILD', '1', '0', d)}"
-VIDEO_CAMERA = "1"
-RASPBERRYPI_CAMERA_V3 = "1"
-hostname:pn-base-files = "reframe"
-DISABLE_SPLASH = "1"
-DISABLE_RPI_BOOT_LOGO = "1"
-CMDLINE_DEBUG = "${@oe.utils.vartrue('DEBUG_BUILD', '', 'quiet loglevel=3', d)}"
-RPI_EXTRA_CONFIG = "dtoverlay=disable-bt\nhdmi_blanking=2\nboot_delay=0\ndisplay_auto_detect=0\ndisable_poe_fan=1\nforce_eeprom_read=0\nenable_tvout=0"
-LICENSE_FLAGS_ACCEPTED += "synaptics-killswitch"
-```
-
-`RASPBERRYPI_CAMERA_V3` selects the Camera Module 3/IMX708 firmware overlay in
-`meta-raspberrypi`. Review the restricted Wi-Fi firmware license before using
-the accepted `synaptics-killswitch` flag.
-
-`DEBUG_BUILD = "1"` enables SSH with empty-password root login, the UART console
-with root autologin, and the `i2c-tools`, `v4l-utils`, and `systemd-analyze`
-packages. This is intentionally insecure and must only be used on a trusted
-bring-up network. Without that setting these development additions are omitted
-and UART is disabled. This standard OpenEmbedded variable also selects debug
-compiler optimization, so unset it or set it to `0` for release builds.
-
-The headless settings skip unused firmware probes. A layer append also forces
-HDMI audio off after the Raspberry Pi machine recipe enables it. Release builds
-add `quiet loglevel=3`; debug builds intentionally retain the serial kernel
-console for recovery. See `docs/boot-analysis.md` for the service-side latency
-changes and measurements to collect on hardware.
-
-The application recipe uses package name `reframe-app`. It cannot use package
-name `reframe` because the machine name is an active BitBake override; the
-recipe retains `reframe` as a compatibility provider while systemd service and
-user-facing names remain unchanged.
-
-## Serial bring-up console
-
-With `DEBUG_BUILD = "1"`, the image enables the UART at 115200 baud and
-automatically logs in as root on the physical serial console. Connect a 3.3 V
-USB-to-UART adapter
-with adapter RX to GPIO14/TX (pin 8), adapter TX to GPIO15/RX (pin 10), and
-ground to a Pi ground pin. Do not connect a 5 V UART signal.
-
-Open the console from the build host, replacing the device path as needed:
-
-```sh
-picocom --baud 115200 /dev/ttyUSB0
-```
-
-The debug image also accepts root SSH login with an empty password. Keep it on a
-trusted isolated network, and disable both SSH empty-password login and serial
-autologin in the eventual production image.
-
-## Build and deploy
-
-Build the bring-up image with the pinned configuration:
-
-```sh
 KAS_WORK_DIR="$PWD" kas build meta-reframe/kas/reframe.yml
 ```
 
-For quicker metadata checks, run:
+The image is written to
+`build/tmp/deploy/images/reframe/reframe-image-minimal-reframe.rootfs.wic.bz2`.
+
+Build an update bundle with:
 
 ```sh
-KAS_WORK_DIR="$PWD" kas shell meta-reframe/kas/reframe.yml -c 'bitbake-layers show-layers'
-KAS_WORK_DIR="$PWD" kas shell meta-reframe/kas/reframe.yml -c 'bitbake-layers show-recipes reframe-image-minimal'
-KAS_WORK_DIR="$PWD" kas shell meta-reframe/kas/reframe.yml -c 'bitbake -p reframe-image-minimal'
+KAS_WORK_DIR="$PWD" kas shell meta-reframe/kas/reframe.yml \
+    -c 'bitbake reframe-update-bundle'
 ```
 
-Build the signed development update bundle with:
+The bundle is written to
+`build/tmp/deploy/images/reframe/reframe-update-bundle-reframe.raucb`.
 
-```sh
-KAS_WORK_DIR="$PWD" kas shell meta-reframe/kas/reframe.yml -c 'bitbake reframe-update-bundle'
-```
+## Flash
 
-The bundle is deployed as
-`build/tmp/deploy/images/reframe/reframe-update-bundle-reframe.raucb`. Inspect
-it on the build host with `rauc-native`, then install it on a test device:
-
-```sh
-KAS_WORK_DIR="$PWD" kas shell meta-reframe/kas/reframe.yml -c \
-    'bitbake rauc-native -c addto_recipe_sysroot && \
-     oe-run-native rauc-native rauc info \
-       --keyring=../meta-reframe/recipes-core/rauc/files/ca.cert.pem \
-       tmp/deploy/images/reframe/reframe-update-bundle-reframe.raucb'
-
-rauc status
-rauc install /path/to/reframe-update-bundle-reframe.raucb
-```
-
-After reboot, use `rauc status` to confirm the new slot is active and marked
-good. During rollback testing, interrupt a trial boot three times and verify
-that U-Boot falls back to the previous slot. Do not deploy production updates
-until both successful activation and forced rollback have been tested on the
-target hardware.
-
-For the normal dashboard procedure, open **settings → software updates**, pick
-the generated `.raucb`, and select **upload and verify bundle**. The install
-button appears only after RAUC validates the signature and compatibility. Start
-the installation and keep power connected while the inactive slot is written;
-the dashboard reports progress and reboots automatically after success.
-Uploads are streamed to `/var/lib/reframe/.updates` with a 2 GiB limit; the
-staged bundle is removed after a successful installation.
-
-Artifacts are written below `build/tmp/deploy/images/reframe/`. The configured
-build produces the stable symlink
-`reframe-image-minimal-reframe.rootfs.wic`, a compressed `.wic.bz2`
-variant, and the matching `.wic.bmap` file.
-
-To flash with Balena Etcher, select the uncompressed `.wic` file as the image,
-select the correct SD card, and start the flash. Etcher writes the complete disk
-layout, so do not extract or copy individual partitions.
-
-For command-line deployment, confirm the destination device and flash the
-compressed image with:
+Flash the `.wic.bz2` image with Balena Etcher, or use `bmaptool`. Replace
+`/dev/sdX` with the whole SD-card device; its contents will be overwritten.
 
 ```sh
 sudo bmaptool copy \
@@ -203,177 +41,14 @@ sudo bmaptool copy \
     /dev/sdX
 ```
 
-The 2026-08-20 pre-machine build completed all 10,405 tasks successfully. This
-confirms the metadata, PiSugar package QA, root filesystem, SPDX/SBOM
-generation, and WIC image build for the inherited board configuration. A
-subsequent `MACHINE = "reframe"` build passed parsing and image recipe QA, then
-was stopped by the operator during the uncached kernel-module build. Complete
-one full custom-machine build before treating the transition as image-validated.
-The libcamera capture path and PiSugar I2C addresses have been validated on
-physical hardware; repeat the service-level tests below after deploying this
-milestone.
+Insert the card and power on the device. If needed, join `reFrame-Setup` and
+open `http://10.42.0.1` to configure Wi-Fi. The dashboard is then available at
+`http://reframe.local`.
 
-The `Yocto sanity` GitHub Actions workflow performs fast kas and BitBake metadata
-checks for pull requests and pushes to `main`. Run the separate `Yocto full layer
-check` workflow manually when the complete `yocto-check-layer` signature suite
-is needed. Neither workflow compiles or boots the image.
-Full builds require about 66 GB of build-directory storage and remain a local
-developer responsibility.
+## Update
 
-On the target, verify boot, interfaces, and camera discovery:
+Open **Settings → Software updates** in the dashboard, select the generated
+`.raucb`, and upload it. Start the installation and keep the device powered.
+The dashboard shows progress and reboots automatically when finished.
 
-```sh
-systemctl is-system-running
-ls -l /dev/i2c* /dev/spidev* /dev/video* /dev/v4l-subdev*
-dmesg | grep -Ei 'imx708|camera|i2c|spi'
-systemd-analyze critical-chain
-```
-
-List cameras and perform a headless still capture with:
-
-```sh
-rpicam-hello --list-cameras
-rpicam-still -n --timeout 2000 -o /tmp/camera-test.jpg
-ls -lh /tmp/camera-test.jpg
-```
-
-Verify the Python API with a second headless still capture:
-
-```sh
-python3 - <<'PY'
-from picamera2 import Picamera2
-
-camera = Picamera2()
-try:
-    camera.start_and_capture_file(
-        "/tmp/picamera2-test.jpg", show_preview=False
-    )
-finally:
-    camera.close()
-PY
-ls -lh /tmp/picamera2-test.jpg
-```
-
-Verify the packaged application service and its persistent outputs with:
-
-```sh
-systemctl status reframe.service
-journalctl -u reframe.service -b --no-pager
-find /var/lib/reframe/photos -maxdepth 1 -type f -name '*.jpg' -print
-find /var/lib/reframe/dithered_photos -maxdepth 1 -type f -name '*.png' -print
-stat /var/lib/reframe/settings.json
-test ! -w /usr/lib/reframe/reframe.py
-```
-
-The service attempts Camera Module 3 HDR setup before opening Picamera2 and
-continues gracefully when that V4L2 control is unavailable. It takes one
-startup capture, writes the original JPEG and processed PNG as `reframe`, then
-waits for the PiSugar button on I2C. Reboot the board and confirm that settings
-and existing numbered captures persist and that a new capture uses the next
-number.
-
-The Waveshare driver is installed from the pinned reFrame source and uses
-`/dev/spidev0.0` for panel data plus `/dev/gpiochip0` for GPIO17 (reset),
-GPIO25 (data/command), GPIO24 (busy), and GPIO18 (panel power). Automatic
-display is enabled in the image's default settings. Stop the camera service
-before the independent test so it releases those GPIO lines:
-
-```sh
-systemctl stop reframe.service
-runuser -u reframe -- reframe-display-test
-systemctl start reframe.service
-journalctl -u reframe.service -b --no-pager
-```
-
-The test should render black, white, yellow, red, blue, and green bars and then
-put the panel to sleep. After restarting the service, take a photo and confirm
-its processed image refreshes the panel. Repeat several captures and reboot
-once to verify clean GPIO/SPI release and automatic display recovery.
-
-The packaged application polls the PiSugar power-button state directly over
-I2C, matching the original reFrame hardware design. Without PiSugar hardware,
-the startup capture still succeeds; button read failures are logged and retried.
-
-## PiSugar power and RTC
-
-The image builds `pisugar-server` and `pisugar-poweroff` from pinned Rust
-sources. `pisugar-server` is configured for PiSugar 3 and exposes a Unix socket
-at `/run/pisugar/pisugar-server.sock` plus a loopback-only compatibility port at
-`127.0.0.1:8423`. It is not reachable from Wi-Fi. The layer disables shell
-actions from programmable-button tap events. reFrame independently measures
-the power-button press duration and captures only on a short press; long presses
-remain reserved for PiSugar shutdown behavior.
-
-At boot, `pisugar-rtc-restore.service` restores a plausible UTC value from the
-PiSugar RTC before reFrame starts. After network time synchronization,
-`pisugar-rtc-update.service` writes UTC back to the RTC. The server requests an
-orderly shutdown after 30 seconds below 5 percent charge, and
-`pisugar-poweroff.service` tells the board to cut power after Linux shuts down.
-
-Inspect the integration on the target with:
-
-```sh
-systemctl status pisugar-server pisugar-rtc-restore pisugar-rtc-update
-systemctl status pisugar-poweroff
-printf 'get model\nget battery\nget rtc_time\nget anti_mistouch\n' \
-    | nc -U -w 2 -q 0 /run/pisugar/pisugar-server.sock
-ss -lntp | grep 8423
-journalctl -u pisugar-server -u pisugar-rtc-restore -b --no-pager
-```
-
-The socket query should report PiSugar 3 data, `anti_mistouch: false`, and a
-plausible RTC time. Port 8423 must listen only on `127.0.0.1`. Test low-battery
-and final power-cut behavior with the device attended; do not deliberately
-deep-discharge the battery.
-
-## Wi-Fi provisioning
-
-Wi-Fi can be prepared before the first boot. After writing the image, place a
-file named `reframe-wifi.json` in the top level of the computer-visible boot
-partition:
-
-```json
-{
-  "ssid": "My Wi-Fi",
-  "password": "correct horse battery staple",
-  "hidden": false
-}
-```
-
-`password` may be omitted or empty for an open network, and `hidden` defaults
-to `false`. SSIDs and passwords may contain spaces and punctuation because the
-file is parsed as JSON, not as shell code. On boot, reFrame creates a persistent
-NetworkManager profile and erases the plaintext JSON file. Remove the card
-safely after copying it and provision it in a trusted environment: until first
-boot consumes the file, anyone who can read the FAT boot partition can see the
-password. If parsing fails, the credentials are erased and a non-secret
-`reframe-wifi.error.txt` explanation is written beside them.
-
-On first boot, or whenever no saved Wi-Fi connection can be activated, join the
-open `reFrame-Setup` access point. Phones and laptops should open the Wi-Fi
-setup page as a captive portal; `http://10.42.0.1` remains the manual fallback.
-Select a network and enter its password. The access point disappears while the single
-Wi-Fi radio changes to client mode; after it connects, open
-`http://reframe.local`. NetworkManager stores the connection on the device and
-reconnects it on later boots. No Wi-Fi credentials are part of the image.
-
-The setup access point is deliberately open because this milestone cannot show
-a per-device secret without a working display. Provision in a trusted physical
-environment. The setup service keeps listening after provisioning so network
-settings can be changed at `http://reframe.local`; authentication and HTTPS are
-required before treating that page as a production management interface.
-
-Inspect or recover networking over UART with:
-
-```sh
-systemctl status NetworkManager reframe-wifi-import reframe-network avahi-daemon
-nmcli device status
-nmcli connection show
-journalctl -u reframe-wifi-import -u reframe-network -u NetworkManager -b --no-pager
-```
-
-## Contributing
-
-Send patches through GitHub pull requests. Keep each patch focused on one
-milestone and state the validation performed. The layer maintainer is Oleksii
-Kutuzov <oleksii.kutuzov@icloud.com>.
+See [KNOWLEDGE.md](KNOWLEDGE.md) for architecture and maintenance details.
